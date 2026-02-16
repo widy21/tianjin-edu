@@ -12,15 +12,36 @@ class ConfigTool:
         self.config = self._load_config()
 
     def _load_config(self):
-        try:
-            if not os.path.exists(self.config_path):
-                raise FileNotFoundError(f"配置文件 {self.config_path} 不存在")
-
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"加载配置文件出错: {e}")
-            return {}
+        """
+        加载配置文件，支持回退机制：
+        1. 优先读取 config.json（本地配置，包含敏感信息，被 gitignore）
+        2. 如果不存在，回退到 config.json.example（模板文件，可提交到 Git）
+        """
+        config = {}
+        
+        # 尝试读取主配置文件
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                print(f"已加载配置文件: {self.config_path}")
+                return config
+            except Exception as e:
+                print(f"加载配置文件出错: {e}")
+        
+        # 回退到 example 文件
+        example_path = self.config_path.replace('.json', '.json.example')
+        if os.path.exists(example_path):
+            try:
+                with open(example_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                print(f"已加载配置模板: {example_path}")
+                return config
+            except Exception as e:
+                print(f"加载配置模板出错: {e}")
+        
+        print("警告: 未找到任何配置文件，将使用默认值")
+        return {}
 
     def get_username(self):
         """从环境变量获取用户名"""
