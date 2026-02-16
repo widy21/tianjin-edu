@@ -5,6 +5,10 @@ from logging.handlers import RotatingFileHandler
 
 from flask import Flask, render_template, redirect, url_for, request, session, flash, send_file
 from werkzeug.utils import safe_join
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 # 配置基础目录
 DOWNLOAD_FOLDER = os.path.abspath('result-files')
@@ -12,16 +16,18 @@ DOWNLOAD_FOLDER = os.path.abspath('result-files')
 from get_excel_data_curr.main import process
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # 用于会话加密
+
+# 从环境变量获取 Secret Key
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # 配置日志
 setup_logging()  # 多次调用不会重复配置
 
-# 模拟数据库中的用户数据
+# 从环境变量获取用户凭据
 users = {
-    'admin': 'admin123',
-    'lily': 'lily2025',
-    'edu': 'edu2025',
+    'admin': os.environ.get('USER_ADMIN_PASSWORD', 'admin123'),
+    'lily': os.environ.get('USER_LILY_PASSWORD', 'lily2025'),
+    'edu': os.environ.get('USER_EDU_PASSWORD', 'edu2025'),
 }
 
 
@@ -32,7 +38,8 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        logging.debug(f"Received POST request with username: {username} and password: {password}")
+        # 安全修复：不再记录密码
+        logging.debug(f"Received POST request with username: {username}")
 
         # 检查用户名是否存在
         if username not in users:

@@ -1,0 +1,13 @@
+# edu-flask 项目依赖
+
+# Web 框架
+Flask>=2.0.0
+
+# 自动化测试
+selenium>=4.0.0
+
+# Excel 处理
+openpyxl>=3.0.0
+
+# 环境变量管理
+python-dotenv>=1.0.0
