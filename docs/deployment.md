@@ -22,12 +22,25 @@
 
 | 文件 | Git 状态 | 说明 |
 |------|----------|------|
-| `.env` | 忽略 | 敏感配置（密码、密钥）|
+| `.env` | 忽略 | 敏感配置（密码、密钥、路径）|
 | `get_excel_data_curr/config.json` | 忽略 | 完整配置文件 |
 | `.env.example` | 已提交 | 环境变量模板 |
 | `config.json.example` | 已提交 | 配置文件模板 |
 
 **重要**：`python-dotenv` 会自动读取 `.env` 文件，无需手动 `export` 环境变量。
+
+### Chrome/ChromeDriver 配置
+
+`.env` 中的以下配置决定了 Selenium 如何管理浏览器驱动：
+
+| 环境变量 | 服务器部署 | 本地开发 |
+|----------|------------|----------|
+| `CHROME_BINARY_PATH` | `/opt/google/chrome/chrome` | 留空（自动检测） |
+| `CHROMEDRIVER_PATH` | `/usr/local/bin/chromedriver` | 留空（自动管理） |
+
+**说明**：
+- **服务器**：填写实际路径，使用服务器上安装的 Chrome 和 ChromeDriver
+- **本地开发**：留空让 Selenium 自动下载和管理驱动（需要网络连接）
 
 ---
 
