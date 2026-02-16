@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>用户登录</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            background-image: url('{{ url_for('static', filename='login-background.jpg') }}');
+            background-size: cover;
+            background-position: center;
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .login-container {
+            // background-color: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>用户登录</h2>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+{#                <ul>#}
+{#                    {% for message in messages %}#}
+{#                        <li>{{ message }}</li>#}
+{#                    {% endfor %}#}
+{#                </ul>#}
+                <ul>
+                    <li>{{ messages[-1] }}</li>
+                </ul>
+            {% endif %}
+        {% endwith %}
+        <form method="post">
+            <label for="username">用户名:</label>
+            <input type="text" name="username" id="username" required><br>
+            <label for="password">密码:</label>
+            <input type="password" name="password" id="password" required><br>
+            <button type="submit">登录</button>
+        </form>
+    </div>
+</body>
+</html>
+

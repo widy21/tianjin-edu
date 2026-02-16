@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>用户中心</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+    <style>
+        body {
+            background-image: url('{{ url_for('static', filename='dashboard-bg1.jpg') }}');
+            background-size: cover;
+            background-position: center;
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .dashboard-container {
+            //background-color: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .time-group {
+            display: flex;
+            gap: 20px;
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard-container">
+    <h2 style='font-size:16px'>欢迎，{{ username }}！这是您的个人页面。<a href="{{ url_for('logout') }}"  style='color:red;weight:500;'>退出登录</a></h2>
+    <p style='color:blue;weight:500;'>2025-12-04更新日志：新增西院公寓（13-17B栋）；新增全选/反选按钮；按钮防重复点击。</p>
+    <p style='color:blue;weight:500;'>2025-05-30更新日志：导出数据中只保留每个学生最晚打卡记录。</p>
+    <p style='color:blue;weight:500;'>2025-05-29更新日志：支持不同用户同时操作。</p>
+<hr>
+
+    <form id="queryForm" onsubmit="handleSubmit(event)">
+        <div class="form-group">
+            <label>公寓名称:</label>
+            {% if username == 'admin' %}
+            <button type="button" id="btnToggleAll" onclick="toggleAllBuildings()" style="margin-left: 10px; padding: 2px 8px; font-size: 12px; cursor: pointer;">全选/反选</button>
+            {% endif %}
+
+            <!-- 中院（1-12B栋） -->
+            <div style="margin-bottom: 10px;">
+                <span style="font-weight: bold; color: #2196F3; margin-right: 10px;">【中院】</span>
+                {% if username == 'admin' %}
+                <button type="button" onclick="toggleZhongyuan()" style="padding: 2px 8px; font-size: 12px; cursor: pointer; margin-right: 10px;">全选/反选</button>
+                {% endif %}
+                <div class="checkbox-container" id="zhongyuan-buildings" style="display: inline-flex; flex-wrap: wrap; gap: 5px;">
+                    {% for i in range(14) %}
+                        {% if i == 10 %}
+                            <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> 11A栋</label>
+                        {% elif i == 11 %}
+                            <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> 11B栋</label>
+                        {% elif i == 12 %}
+                            <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> 12A栋</label>
+                        {% elif i == 13 %}
+                            <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> 12B栋</label>
+                        {% else %}
+                            <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> {{ i+1 }}栋</label>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 西院（13-17B栋） -->
+            <div style="margin-bottom: 10px;">
+                <span style="font-weight: bold; color: #4CAF50; margin-right: 10px;">【西院】</span>
+                {% if username == 'admin' %}
+                <button type="button" onclick="toggleXiyuan()" style="padding: 2px 8px; font-size: 12px; cursor: pointer; margin-right: 10px;">全选/反选</button>
+                {% endif %}
+                <div class="checkbox-container" id="xiyuan-buildings" style="display: inline-flex; flex-wrap: wrap; gap: 5px;">
+                    <label><input type="checkbox" name="building" value="15" onchange="updateSelectedBuildings()"> 13栋</label>
+                    <label><input type="checkbox" name="building" value="16" onchange="updateSelectedBuildings()"> 14栋</label>
+                    <label><input type="checkbox" name="building" value="17" onchange="updateSelectedBuildings()"> 15栋</label>
+                    <label><input type="checkbox" name="building" value="18" onchange="updateSelectedBuildings()"> 16栋</label>
+                    <label><input type="checkbox" name="building" value="19" onchange="updateSelectedBuildings()"> 17A栋</label>
+                    <label><input type="checkbox" name="building" value="20" onchange="updateSelectedBuildings()"> 17B栋</label>
+                </div>
+            </div>
+
+            <div id="selectedBuildings"></div>
+        </div>
+
+        <div class="form-group time-group">
+            <div>
+                <label for="startTime">开始时间:</label>
+                <input type="time" id="startTime" name="startTime" required value="23:20:00">
+            </div>
+
+            <div>
+                <label for="endTime">结束时间:</label>
+                <input type="time" id="endTime" name="endTime" required value="05:30:00">
+            </div>
+        </div>
+	<hr>
+        <div class="form-group">
+            <div>可下载文件：<a id="downloadFileName" ></a></div>
+        </div>
+
+        <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px;">
+            <button type="submit" id="submitBtn">确定</button>
+            <button type="button" onclick="resetForm()">重置</button>
+        </div>
+    </form>
+</div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', function() {
+            {% if username == 'admin' %}
+            // admin账号默认选中第4、5、7个元素（索引从0开始）
+            const checkboxes = document.querySelectorAll('.checkbox-container input[type="checkbox"]');
+            const indexesToSelect = [3, 4, 6]; // 对应第4、5、7个元素的索引
+
+            indexesToSelect.forEach(index => {
+                if (checkboxes[index]) {
+                    checkboxes[index].checked = true;
+                }
+            });
+            {% endif %}
+
+            // 更新已选显示
+	    updateSelectedBuildings();
+        });
+
+    function handleSubmit(event) {
+        event.preventDefault();
+
+	// 禁用确定按钮并置灰
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = '数据处理中...';
+        submitBtn.style.backgroundColor = '#ccc';
+        submitBtn.style.cursor = 'not-allowed';
+
+        // 获取开始和结束时间
+        const startTime = document.getElementById('startTime').value;
+        const endTime = document.getElementById('endTime').value;
+
+        // 这里可以将数据发送到后台接口
+        console.log('Selected Buildings:', selectedBuildings);
+        console.log('Start Time:', startTime);
+        console.log('End Time:', endTime);
+
+        // 模拟发送到后台接口
+        fetch('/query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                buildings: getSelectedBuildings(),
+                startTime: startTime,
+                endTime: endTime,
+		username:"{{username}}",
+            }),
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Response from server:', data);
+                if(data['status'] == 'success'){
+	            submitBtn.disabled = false;
+                    submitBtn.textContent = '确定';
+                    submitBtn.style.backgroundColor = '#4CAF50';
+                    submitBtn.style.cursor = 'pointer';
+
+                    var file_name= data['file_name']
+                    document.getElementById('downloadFileName').href = '/download/'+file_name;
+                    document.getElementById('downloadFileName').textContent = file_name;
+                }else {
+                    alert('数据处理失败');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '确定';
+                    submitBtn.style.backgroundColor = '#4CAF50';
+                    submitBtn.style.cursor = 'pointer';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('提交查询时出错！');
+		submitBtn.disabled = false;
+                submitBtn.textContent = '确定';
+                submitBtn.style.backgroundColor = '#4CAF50';
+                submitBtn.style.cursor = 'pointer';
+            });
+    }
+
+    function resetForm() {
+        document.getElementById('queryForm').reset();
+        document.getElementById('selectedBuildings').textContent = '';
+        document.getElementById('downloadFileName').textContent =  '';
+        // 重置后恢复默认时间
+        document.getElementById('startTime').value = '23:20:00';
+        document.getElementById('endTime').value = '05:30:00';
+    }
+
+    function updateSelectedBuildings() {
+        const checkboxes = document.querySelectorAll('input[name="building"]:checked');
+        const selectedBuildings = Array.from(checkboxes).map(checkbox => convertBuildingShow(checkbox.value));
+        document.getElementById('selectedBuildings').textContent = '已选: 【' + selectedBuildings.join(', ')+'】栋公寓';
+    }
+
+    function getSelectedBuildings() {
+        const checkboxes = document.querySelectorAll('input[name="building"]:checked');
+        return Array.from(checkboxes).map(checkbox => checkbox.value);
+    }
+
+    function convertBuildingShow(bid){
+        if (bid == 11){
+            return '11A'
+        }else if (bid == 12){
+            return '11B'
+        }else if (bid == 13){
+            return '12A'
+        }else if (bid == 14){
+            return '12B'
+        }else if (bid == 15){
+            return '13'
+        }else if (bid == 16){
+            return '14'
+        }else if (bid == 17){
+            return '15'
+        }else if (bid == 18){
+            return '16'
+        }else if (bid == 19){
+            return '17A'
+        }else if (bid == 20){
+            return '17B'
+        }else {
+            return bid
+        }
+    }
+
+    // 全选/反选所有公寓
+    function toggleAllBuildings() {
+        const checkboxes = document.querySelectorAll('input[name="building"]');
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        checkboxes.forEach(cb => cb.checked = !allChecked);
+        updateSelectedBuildings();
+    }
+
+    // 全选/反选中院公寓
+    function toggleZhongyuan() {
+        const container = document.getElementById('zhongyuan-buildings');
+        const checkboxes = container.querySelectorAll('input[name="building"]');
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        checkboxes.forEach(cb => cb.checked = !allChecked);
+        updateSelectedBuildings();
+    }
+
+    // 全选/反选西院公寓
+    function toggleXiyuan() {
+        const container = document.getElementById('xiyuan-buildings');
+        const checkboxes = container.querySelectorAll('input[name="building"]');
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        checkboxes.forEach(cb => cb.checked = !allChecked);
+        updateSelectedBuildings();
+    }
+</script>
+</body>
+</html>
+
