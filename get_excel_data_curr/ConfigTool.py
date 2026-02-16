@@ -76,22 +76,26 @@ class ConfigTool:
         return os.environ.get('ENV') or self.config.get("env", "test")
 
     def get_driver_location(self):
-        """从环境变量获取 ChromeDriver 路径"""
+        """
+        从环境变量获取 ChromeDriver 路径
+        环境变量优先级最高，即使为空字符串也返回（让 Selenium 自动管理）
+        """
+        if 'CHROMEDRIVER_PATH' in os.environ:
+            return os.environ.get('CHROMEDRIVER_PATH', '')
         env = self.get_env()
-        driver_from_env = os.environ.get('CHROMEDRIVER_PATH')
-        if driver_from_env:
-            return driver_from_env
         if env == "prod":
             return self.config.get("driver_location_prod", "")
         else:
             return self.config.get("driver_location_test", "")
 
     def get_binary_location(self):
-        """从环境变量获取 Chrome 浏览器路径"""
+        """
+        从环境变量获取 Chrome 浏览器路径
+        环境变量优先级最高，即使为空字符串也返回（让 Selenium 自动管理）
+        """
+        if 'CHROME_BINARY_PATH' in os.environ:
+            return os.environ.get('CHROME_BINARY_PATH', '')
         env = self.get_env()
-        binary_from_env = os.environ.get('CHROME_BINARY_PATH')
-        if binary_from_env:
-            return binary_from_env
         if env == "prod":
             return self.config.get("binary_location_prod", "")
         else:
