@@ -2,41 +2,60 @@
 
 ## 项目概述
 
-**项目名称**: edu-flask  
-**项目类型**: 学生公寓晚归数据管理系统  
-**技术栈**: Flask + Selenium + openpyxl  
-**主要功能**: 自动化收集、处理学生公寓晚归数据并生成 Excel 报表
+**项目名称**: edu-flask
+**项目类型**: 学生公寓晚归数据管理系统
+**技术栈**: Flask + Selenium + openpyxl + SQLite + APScheduler
+**主要功能**: 自动化收集、处理学生公寓晚归数据并生成 Excel 报表，支持定时自动查询并邮件发送
 
 ## 系统架构
 
 ```mermaid
 graph TD
-    A[用户登录] --> B{身份验证}
+    A[用户登录] --> B{身份验证 - SQLite}
     B -->|成功| C[控制面板 Dashboard]
     B -->|失败| A
     C --> D[选择公寓楼栋]
     C --> E[设置时间范围]
+    C -->|管理员| K[管理页面 /admin/]
     D --> F[提交查询请求 /query]
     E --> F
     F --> G[Selenium 自动化抓取]
     G --> H[数据处理与去重]
     H --> I[生成 Excel 报表]
     I --> J[文件下载 /download]
+    K --> L[用户/权限/任务/配置管理]
+    M[APScheduler 定时调度] --> N[TaskManager 执行任务]
+    N --> G
+    N --> O[EmailSender 发送邮件]
 ```
 
 ## 目录结构
 
 ```
 edu-flask/
-├── app.py                      # Flask 主应用入口
+├── app.py                      # Flask 主应用入口（集成调度器、注册 Blueprint）
 ├── log_config.py               # 日志配置模块
-├── edu.log                     # 应用日志文件
-├── nohup.out                   # 后台运行输出日志
+├── requirements.txt            # Python 依赖
 ├── restart.sh                  # 服务重启脚本
 ├── agent.md                    # 项目说明文档（本文件）
+├── database/                   # 数据库模块
+│   ├── __init__.py
+│   ├── schema.sql             # 数据库表结构（提交 Git）
+│   ├── init_data.sql          # 初始化数据（不提交，含敏感信息）
+│   └── db.py                  # Database 类，封装所有 CRUD 操作
+├── scheduler/                  # 定时任务模块
+│   ├── __init__.py
+│   ├── scheduler.py           # SchedulerManager 定时调度管理
+│   ├── task_manager.py        # TaskManager 任务执行逻辑
+│   └── email_sender.py        # EmailSender 邮件发送
+├── routes/                     # 路由模块
+│   ├── __init__.py
+│   ├── auth.py                # login_required / admin_required 装饰器
+│   └── admin.py               # 管理页面 Blueprint（/admin/ 路由）
 ├── templates/                  # HTML 模板目录
 │   ├── login.html             # 登录页面
-│   └── dashboard.html         # 用户控制面板
+│   ├── dashboard.html         # 用户控制面板
+│   └── admin.html             # 管理页面（6 个 Tab）
 ├── static/                     # 静态资源目录
 │   ├── style.css              # 全局样式
 │   ├── dashboard.css          # 控制面板样式
@@ -48,13 +67,18 @@ edu-flask/
 │   ├── main.py                # 主处理流程（Selenium 抓取）
 │   ├── gen_excel_data_v1.py   # Excel 生成模块
 │   ├── ConfigTool.py          # 配置文件读取工具
-│   ├── config.json            # 配置文件
+│   ├── config.json            # 配置文件（仍被 Selenium 模块读取）
 │   ├── t3.py                  # 数据获取辅助模块
 │   └── get_building_ids.py    # 楼栋 ID 获取工具
+├── data/                       # 数据目录（不提交）
+│   └── edu.db                 # SQLite 数据库文件
 ├── result-files/               # 生成的报表文件存储目录
 │   ├── admin/                 # admin 用户的文件
 │   ├── lily/                  # lily 用户的文件
 │   └── edu/                   # edu 用户的文件
+├── docs/                       # 文档目录
+│   ├── deployment.md          # 部署指南
+│   └── auto_email_task_solution.md  # 自动邮件任务方案文档
 ├── backup/                     # 代码备份目录
 └── plans/                      # 项目规划文档目录
     └── auto_email_task_plan.md
@@ -68,20 +92,21 @@ edu-flask/
 - `GET/POST /login` - 用户登录页面
 - `GET /dashboard` - 用户控制面板（需登录）
 - `GET /logout` - 退出登录
-- `GET /` - 首页（简单问候）
+- `GET /` - 首页
 - `POST /query` - 数据查询接口（Ajax 请求）
 - `GET /download/<path:filename>` - 文件下载接口
+- `/admin/*` - 管理页面（通过 Blueprint 注册，需 admin 权限）
 
 **用户认证**:
-- 硬编码用户字典：`{'admin': 'admin123', 'lily': 'lily2025'}`
-- 基于 Flask session 的会话管理
-- 密钥：`your_secret_key`（生产环境需更换）
+- 用户数据存储在 SQLite `users` 表中
+- 登录时调用 `db.verify_user()` 验证用户名+密码+启用状态
+- 基于 Flask session 的会话管理，存储 `username` 和 `role`
+- Flask 密钥从 `.env` 的 `FLASK_SECRET_KEY` 读取
 
-**关键代码位置**:
-- 用户数据定义：第 21-24 行
-- 登录逻辑：第 28-55 行
-- 查询处理：第 89-98 行
-- 文件下载：第 101-118 行
+**集成功能**:
+- 启动时初始化 `Database` 实例
+- 注册 `admin_bp` Blueprint（管理页面路由）
+- 启动 `SchedulerManager` 定时调度器
 
 ### 2. 数据抓取模块 (get_excel_data_curr/main.py)
 
@@ -129,29 +154,45 @@ edu-flask/
 - 13 栋 → 12A
 - 14 栋 → 12B
 
-### 4. 配置管理 (get_excel_data_curr/config.json)
+### 4. 配置管理
 
-**配置项说明**:
-```json
-{
-  "username": "外部系统登录用户名",
-  "password": "外部系统登录密码",
-  "beginTime": "晚归开始时间（默认 23:20:00）",
-  "endTime": "晚归结束时间（默认 05:30:00）",
-  "flag": "授权标志",
-  "binary_location": "Chrome 浏览器路径",
-  "driver_location": "ChromeDriver 路径",
-  "pagesize": "分页大小",
-  "data_cfg": {
-    "学院全称": "报表中显示的简称"
-  },
-  "bid_dict": {
-    "楼栋编号": "楼栋 ID（用于 API 请求）"
-  }
-}
-```
+**当前方案**：所有配置统一存储在 SQLite `system_config` 表中，通过管理页面在线修改。
 
-### 5. 日志系统 (log_config.py)
+| 配置项 | 说明 |
+|--------|------|
+| `tust_username` / `tust_password` | 公寓管理系统凭据 |
+| `env` | 运行环境（test/prod） |
+| `chrome_binary_path` / `chromedriver_path` | 浏览器路径 |
+| `smtp_server` / `smtp_port` / `sender_email` / `sender_password` | SMTP 邮件配置 |
+| `scheduler_enabled` / `scheduler_timezone` | 调度器配置 |
+| `bid_dict` | 楼栋 ID 映射（JSON） |
+| `data_cfg` | 学院名称映射（JSON） |
+
+> **注意**：`get_excel_data_curr/ConfigTool.py` 仍从 `config.json` 和环境变量读取配置，尚未改造为读取数据库。
+
+### 5. 数据库模块 (database/db.py)
+
+`Database` 类封装所有数据库操作，初始化时自动执行 `schema.sql` 建表。
+
+**5 张表**：`users`、`system_config`、`email_tasks`、`task_logs`、`permissions`
+
+**核心方法**：
+- `verify_user()` — 登录验证
+- `get_config()` / `set_config()` — 系统配置读写
+- 邮件任务 CRUD、任务日志记录、权限管理
+
+### 6. 定时任务模块 (scheduler/)
+
+- **SchedulerManager** (`scheduler.py`)：基于 APScheduler 的 BackgroundScheduler，为每个邮件任务创建 CronTrigger
+- **TaskManager** (`task_manager.py`)：执行任务核心逻辑，调用 `process()` 生成 Excel → 发送邮件 → 记录日志
+- **EmailSender** (`email_sender.py`)：SMTP 邮件发送，支持 TLS 和附件
+
+### 7. 管理路由模块 (routes/)
+
+- **admin.py**：Flask Blueprint（`url_prefix='/admin/'`），提供用户/权限/任务/配置/调度器的 REST API
+- **auth.py**：`@login_required` 和 `@admin_required` 装饰器
+
+### 8. 日志系统 (log_config.py)
 
 **配置参数**:
 - 日志文件：`edu.log`
@@ -179,12 +220,16 @@ edu-flask/
 - 已选楼栋实时显示
 - 提交按钮（异步请求）
 - 文件下载链接
+- 管理员用户显示「系统管理」入口链接
 
-**JavaScript 功能**:
-- 默认选中 4、5、7 栋（第 83-96 行）
-- Ajax 提交查询（第 98-152 行）
-- 表单重置（第 154-161 行）
-- 楼栋名称转换显示（第 174-186 行）
+### 管理页面 (templates/admin.html)
+6 个 Tab 页签：
+- **邮件任务**：任务 CRUD + 手动触发执行
+- **用户管理**：创建/编辑/删除/启用禁用用户
+- **权限管理**：为用户分配 query/download/admin/trigger_task 权限
+- **执行记录**：查看任务执行历史和状态
+- **系统配置**：在线编辑所有系统配置项
+- **调度器**：查看调度器状态、任务列表、重新加载
 
 ## API 接口
 
@@ -208,12 +253,22 @@ edu-flask/
 ```
 
 ### GET /download/<path:filename>
-**示例**: `/download/result-files/admin/公寓学生晚归名单12.3.xlsx`
+**安全措施**: `safe_join()` 防路径遍历、文件存在性检查
 
-**安全措施**:
-- 使用 `safe_join()` 防止路径遍历攻击
-- 移除重复的目录名
-- 文件存在性检查
+### 管理 API（/admin/api/，需 admin 权限）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET/POST | `/admin/api/users` | 用户列表/创建 |
+| PUT/DELETE | `/admin/api/users/<username>` | 更新/删除用户 |
+| GET/PUT | `/admin/api/permissions/<username>` | 获取/设置权限 |
+| GET/POST | `/admin/api/email-tasks` | 任务列表/创建 |
+| PUT/DELETE | `/admin/api/email-tasks/<id>` | 更新/删除任务 |
+| POST | `/admin/api/trigger-task/<id>` | 手动触发任务 |
+| GET | `/admin/api/task-logs` | 执行记录 |
+| GET/PUT | `/admin/api/config` | 系统配置 |
+| GET | `/admin/api/scheduler/status` | 调度器状态 |
+| POST | `/admin/api/scheduler/reload` | 重新加载调度器 |
 
 ## 部署配置
 
@@ -222,17 +277,14 @@ edu-flask/
 - 端口：`80`（HTTP 标准端口）
 - 后台运行：支持 nohup
 
-**重启脚本** (restart.sh):
-```bash
-#!/bin/bash
-# 查找并杀死旧进程
-# 启动新进程
-```
+**数据存储**:
+- 所有配置和用户数据存储在 `data/edu.db`（SQLite）
+- `.env` 仅保留 `FLASK_SECRET_KEY`
+- 详见 `docs/deployment.md`
 
 **日志文件**:
 - `edu.log` - 应用日志（轮转，最大 100MB）
-- `nohup.out` - nohup 输出日志
-- `out.log` - 其他输出日志
+- `out.log` - nohup 输出日志
 
 ## 业务流程
 
@@ -279,12 +331,18 @@ edu-flask/
 ✅ **易于维护**: 配置文件化，详细的日志记录  
 ✅ **多用户支持**: 按用户分目录存储文件
 
+### 已解决
+✅ **密码硬编码** → 已迁移到 SQLite 数据库
+✅ **密钥管理** → Flask secret key 从 `.env` 环境变量读取
+✅ **依赖管理** → 已有 `requirements.txt`
+✅ **权限控制** → 已实现用户角色和细粒度权限
+✅ **定时任务** → 已实现自动查询+邮件发送
+
 ### 待改进
-⚠️ **密码硬编码**: 用户密码应迁移到数据库  
-⚠️ **密钥管理**: Flask secret key 应使用环境变量  
-⚠️ **错误处理**: 前端错误提示可以更友好  
-⚠️ **测试覆盖**: 缺少单元测试和集成测试  
-⚠️ **依赖管理**: 缺少 requirements.txt
+⚠️ **ConfigTool 改造**: `get_excel_data_curr/ConfigTool.py` 仍从 `config.json` 读取，未改为读数据库
+⚠️ **错误处理**: 前端错误提示可以更友好
+⚠️ **测试覆盖**: 缺少单元测试和集成测试
+⚠️ **密码加密**: 用户密码目前明文存储，应使用哈希
 
 ## 依赖库
 
@@ -292,6 +350,9 @@ edu-flask/
 Flask>=2.0.0
 selenium>=4.0.0
 openpyxl>=3.0.0
+python-dotenv>=1.0.0
+requests>=2.28.0
+APScheduler>=3.10.0
 ```
 
 ## 开发指南
@@ -299,43 +360,30 @@ openpyxl>=3.0.0
 ### 本地运行
 ```bash
 # 安装依赖
-pip install flask selenium openpyxl
+pip install -r requirements.txt
 
-# 配置 Chrome 和 ChromeDriver
-# 修改 get_excel_data_curr/config.json
+# 初始化数据库
+mkdir -p data
+sqlite3 data/edu.db < database/schema.sql
+sqlite3 data/edu.db < database/init_data.sql
+
+# 配置 .env
+echo 'FLASK_SECRET_KEY=dev-secret-key' > .env
 
 # 启动应用
 python app.py
 ```
 
 ### 添加新用户
-在 `app.py` 的 `users` 字典中添加：
-```python
-users = {
-    'admin': 'admin123',
-    'lily': 'lily2025',
-    'newuser': 'newpassword',  # 添加新用户
-}
+通过管理页面（`/admin/` → 用户管理 Tab）在线添加，或在 `database/init_data.sql` 中添加：
+```sql
+INSERT OR IGNORE INTO users (username, password, role) VALUES ('newuser', 'password', 'user');
 ```
 
-### 修改楼栋配置
-编辑 `get_excel_data_curr/config.json` 中的 `bid_dict`：
-```json
-"bid_dict": {
-  "1": "楼栋1的ID",
-  "2": "楼栋2的ID",
-  ...
-}
-```
-
-### 修改学院名称映射
-编辑 `get_excel_data_curr/config.json` 中的 `data_cfg`：
-```json
-"data_cfg": {
-  "人工智能学院": "人工智能学院",
-  "理学院": "理学院",
-  ...
-}
+### 修改系统配置
+通过管理页面（`/admin/` → 系统配置 Tab）在线修改，或直接操作数据库：
+```bash
+sqlite3 data/edu.db "UPDATE system_config SET config_value='new_value' WHERE config_key='key';"
 ```
 
 ## 常见问题
@@ -357,6 +405,12 @@ A: 修改 `app.py` 最后一行的 `port=80` 为其他端口。
 
 ## 更新日志
 
+- **2026-02**: 新增自动邮件定时任务功能和后台管理页面
+  - SQLite 数据库统一存储用户、配置、任务、日志、权限
+  - APScheduler 定时调度，支持 Cron 表达式
+  - 管理页面（6 个 Tab）：邮件任务、用户管理、权限管理、执行记录、系统配置、调度器
+  - Flask Blueprint 路由分离
+  - `.env` 精简为仅 `FLASK_SECRET_KEY`
 - **2025-05-30**: 导出数据中只保留每个学生最晚打卡记录
 - **2025-05-29**: 支持不同用户同时操作
 - **初始版本**: 基础功能实现

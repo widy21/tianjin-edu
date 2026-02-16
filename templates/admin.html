@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>系统管理</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header h2 { margin: 0; }
+        .header a { color: red; text-decoration: none; margin-left: 15px; }
+        .tabs { display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid #4CAF50; }
+        .tab-btn { padding: 10px 24px; border: 1px solid #ddd; border-bottom: none; background: #e8e8e8; cursor: pointer; font-size: 14px; border-radius: 6px 6px 0 0; margin-right: 2px; }
+        .tab-btn.active { background: #4CAF50; color: white; border-color: #4CAF50; }
+        .tab-content { display: none; background: white; padding: 20px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 6px 6px; }
+        .tab-content.active { display: block; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+        th { background: #f0f0f0; }
+        .btn { padding: 5px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; margin: 2px; }
+        .btn-primary { background: #4CAF50; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+        .btn-warning { background: #ff9800; color: white; }
+        .btn-info { background: #2196F3; color: white; }
+        .btn-sm { padding: 3px 8px; font-size: 12px; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; }
+        .modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 24px; border-radius: 8px; z-index: 101; min-width: 450px; max-height: 80vh; overflow-y: auto; }
+        .modal h3 { margin-top: 0; }
+        .form-row { margin-bottom: 12px; }
+        .form-row label { display: block; margin-bottom: 4px; font-weight: bold; font-size: 13px; }
+        .form-row input, .form-row select, .form-row textarea { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .form-row textarea { height: 60px; resize: vertical; }
+        .status-badge { padding: 2px 8px; border-radius: 10px; font-size: 12px; color: white; }
+        .status-success { background: #4CAF50; }
+        .status-failed { background: #f44336; }
+        .status-running { background: #2196F3; }
+        .status-pending { background: #9e9e9e; }
+        .status-email_failed { background: #ff9800; }
+        .toggle-on { color: #4CAF50; font-weight: bold; }
+        .toggle-off { color: #999; }
+        .toolbar { margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
+        .checkbox-group label { font-size: 13px; font-weight: normal; display: inline-flex; align-items: center; gap: 3px; }
+        .perm-group { margin-bottom: 8px; padding: 8px; background: #f9f9f9; border-radius: 4px; }
+        .perm-group .username { font-weight: bold; margin-bottom: 4px; }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h2>系统管理</h2>
+    <div>
+        <span>{{ username }}</span>
+        <a href="{{ url_for('dashboard') }}">返回面板</a>
+        <a href="{{ url_for('logout') }}" style="color:red;">退出登录</a>
+    </div>
+</div>
+
+<div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('email-tasks')">邮件任务</button>
+    <button class="tab-btn" onclick="switchTab('users')">用户管理</button>
+    <button class="tab-btn" onclick="switchTab('permissions')">权限管理</button>
+    <button class="tab-btn" onclick="switchTab('task-logs')">执行记录</button>
+    <button class="tab-btn" onclick="switchTab('config')">系统配置</button>
+    <button class="tab-btn" onclick="switchTab('scheduler')">调度器</button>
+</div>
+
+<!-- 邮件任务 Tab -->
+<div id="tab-email-tasks" class="tab-content active">
+    <div class="toolbar">
+        <h3 style="margin:0;">邮件任务配置</h3>
+        <button class="btn btn-primary" onclick="showEmailTaskModal()">+ 新建任务</button>
+    </div>
+    <table>
+        <thead><tr>
+            <th>ID</th><th>任务名称</th><th>用户</th><th>楼栋</th><th>收件人</th>
+            <th>时间段</th><th>Cron</th><th>状态</th><th>操作</th>
+        </tr></thead>
+        <tbody id="email-tasks-body"></tbody>
+    </table>
+</div>
+
+<!-- 用户管理 Tab -->
+<div id="tab-users" class="tab-content">
+    <div class="toolbar">
+        <h3 style="margin:0;">用户管理</h3>
+        <button class="btn btn-primary" onclick="showUserModal()">+ 新建用户</button>
+    </div>
+    <table>
+        <thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+        <tbody id="users-body"></tbody>
+    </table>
+</div>
+
+<!-- 权限管理 Tab -->
+<div id="tab-permissions" class="tab-content">
+    <div class="toolbar"><h3 style="margin:0;">权限管理</h3></div>
+    <div id="permissions-container"></div>
+</div>
+
+<!-- 执行记录 Tab -->
+<div id="tab-task-logs" class="tab-content">
+    <div class="toolbar">
+        <h3 style="margin:0;">任务执行记录</h3>
+        <button class="btn btn-info" onclick="loadTaskLogs()">刷新</button>
+    </div>
+    <table>
+        <thead><tr><th>ID</th><th>任务名称</th><th>用户</th><th>状态</th><th>文件</th><th>错误信息</th><th>执行时间</th></tr></thead>
+        <tbody id="task-logs-body"></tbody>
+    </table>
+</div>
+
+<!-- 系统配置 Tab -->
+<div id="tab-config" class="tab-content">
+    <div class="toolbar">
+        <h3 style="margin:0;">系统配置</h3>
+        <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+    </div>
+    <table>
+        <thead><tr><th>配置项</th><th>值</th><th>说明</th></tr></thead>
+        <tbody id="config-body"></tbody>
+    </table>
+</div>
+
+<!-- 调度器 Tab -->
+<div id="tab-scheduler" class="tab-content">
+    <div class="toolbar">
+        <h3 style="margin:0;">调度器状态</h3>
+        <div>
+            <button class="btn btn-info" onclick="loadSchedulerStatus()">刷新</button>
+            <button class="btn btn-warning" onclick="reloadScheduler()">重新加载</button>
+        </div>
+    </div>
+    <div id="scheduler-info"></div>
+</div>
+
+<!-- 模态框占位 -->
+<div id="modal-overlay" class="modal-overlay" onclick="closeModal()"></div>
+<div id="modal-container"></div>
+
+<script>
+// ==================== Tab 切换 ====================
+function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+    // 切换时加载数据
+    const loaders = {
+        'email-tasks': loadEmailTasks, 'users': loadUsers,
+        'permissions': loadPermissions, 'task-logs': loadTaskLogs,
+        'config': loadConfig, 'scheduler': loadSchedulerStatus
+    };
+    if (loaders[name]) loaders[name]();
+}
+
+function closeModal() {
+    document.getElementById('modal-overlay').style.display = 'none';
+    document.getElementById('modal-container').innerHTML = '';
+}
+
+function api(url, method, data) {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (data) opts.body = JSON.stringify(data);
+    return fetch(url, opts).then(r => r.json());
+}
+
+// ==================== 楼栋映射 ====================
+const buildingMap = {
+    '1':'1栋','2':'2栋','3':'3栋','4':'4栋','5':'5栋','6':'6栋','7':'7栋',
+    '8':'8栋','9':'9栋','10':'10栋','11':'11A栋','12':'11B栋','13':'12A栋','14':'12B栋',
+    '15':'13栋','16':'14栋','17':'15栋','18':'16栋','19':'17A栋','20':'17B栋'
+};
+function buildingLabel(id) { return buildingMap[id] || id + '栋'; }
+
+function buildingCheckboxes(selected) {
+    selected = selected || [];
+    let html = '<div style="margin-bottom:6px;font-weight:bold;color:#2196F3;">中院</div><div class="checkbox-group">';
+    for (let i = 1; i <= 14; i++) {
+        const checked = selected.includes(String(i)) ? 'checked' : '';
+        html += `<label><input type="checkbox" name="building" value="${i}" ${checked}> ${buildingLabel(String(i))}</label>`;
+    }
+    html += '</div><div style="margin:8px 0 6px;font-weight:bold;color:#4CAF50;">西院</div><div class="checkbox-group">';
+    for (let i = 15; i <= 20; i++) {
+        const checked = selected.includes(String(i)) ? 'checked' : '';
+        html += `<label><input type="checkbox" name="building" value="${i}" ${checked}> ${buildingLabel(String(i))}</label>`;
+    }
+    html += '</div>';
+    return html;
+}
+
+// ==================== 邮件任务 ====================
+function loadEmailTasks() {
+    api('/admin/api/email-tasks', 'GET').then(tasks => {
+        const tbody = document.getElementById('email-tasks-body');
+        tbody.innerHTML = tasks.map(t => `<tr>
+            <td>${t.id}</td>
+            <td>${t.task_name}</td>
+            <td>${t.username}</td>
+            <td>${t.buildings.map(b => buildingLabel(b)).join(', ')}</td>
+            <td style="font-size:12px;">${t.recipients.join('<br>')}</td>
+            <td>${t.start_time} ~ ${t.end_time}</td>
+            <td>${t.cron_expression}</td>
+            <td><span class="${t.enabled ? 'toggle-on' : 'toggle-off'}">${t.enabled ? '启用' : '禁用'}</span></td>
+            <td>
+                <button class="btn btn-info btn-sm" onclick="showEmailTaskModal(${t.id})">编辑</button>
+                <button class="btn btn-warning btn-sm" onclick="triggerTask(${t.id})">执行</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteEmailTask(${t.id})">删除</button>
+            </td>
+        </tr>`).join('');
+    });
+}
+
+function showEmailTaskModal(id) {
+    const isEdit = !!id;
+    const load = isEdit ? api(`/admin/api/email-tasks`, 'GET').then(ts => ts.find(t => t.id === id)) : Promise.resolve(null);
+    load.then(t => {
+        t = t || { task_name:'', username:'', buildings:[], recipients:[], subject_prefix:'', start_time:'23:20:00', end_time:'05:30:00', cron_expression:'0 6 * * *', enabled:1 };
+        document.getElementById('modal-overlay').style.display = 'block';
+        document.getElementById('modal-container').innerHTML = `<div class="modal">
+            <h3>${isEdit ? '编辑' : '新建'}邮件任务</h3>
+            <div class="form-row"><label>任务名称</label><input id="et-name" value="${t.task_name}"></div>
+            <div class="form-row"><label>关联用户</label><input id="et-user" value="${t.username}"></div>
+            <div class="form-row"><label>楼栋</label><div id="et-buildings">${buildingCheckboxes(t.buildings)}</div></div>
+            <div class="form-row"><label>收件人（每行一个）</label><textarea id="et-recipients">${t.recipients.join('\n')}</textarea></div>
+            <div class="form-row"><label>邮件主题前缀</label><input id="et-prefix" value="${t.subject_prefix}"></div>
+            <div class="form-row" style="display:flex;gap:10px;">
+                <div style="flex:1"><label>开始时间</label><input type="time" id="et-start" value="${t.start_time}" step="1"></div>
+                <div style="flex:1"><label>结束时间</label><input type="time" id="et-end" value="${t.end_time}" step="1"></div>
+            </div>
+            <div class="form-row"><label>Cron 表达式</label><input id="et-cron" value="${t.cron_expression}"></div>
+            <div class="form-row"><label><input type="checkbox" id="et-enabled" ${t.enabled ? 'checked' : ''}> 启用</label></div>
+            <div style="text-align:right;margin-top:15px;">
+                <button class="btn" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveEmailTask(${isEdit ? id : 'null'})">${isEdit ? '保存' : '创建'}</button>
+            </div>
+        </div>`;
+    });
+}
+
+function saveEmailTask(id) {
+    const buildings = Array.from(document.querySelectorAll('#et-buildings input:checked')).map(c => c.value);
+    const recipients = document.getElementById('et-recipients').value.split('\n').map(s => s.trim()).filter(Boolean);
+    const data = {
+        task_name: document.getElementById('et-name').value,
+        username: document.getElementById('et-user').value,
+        buildings, recipients,
+        subject_prefix: document.getElementById('et-prefix').value,
+        start_time: document.getElementById('et-start').value,
+        end_time: document.getElementById('et-end').value,
+        cron_expression: document.getElementById('et-cron').value,
+        enabled: document.getElementById('et-enabled').checked,
+    };
+    const url = id ? `/admin/api/email-tasks/${id}` : '/admin/api/email-tasks';
+    const method = id ? 'PUT' : 'POST';
+    api(url, method, data).then(r => { if (r.success) { closeModal(); loadEmailTasks(); } else { alert(r.msg); } });
+}
+
+function deleteEmailTask(id) {
+    if (!confirm('确定删除此任务？')) return;
+    api(`/admin/api/email-tasks/${id}`, 'DELETE').then(() => loadEmailTasks());
+}
+
+function triggerTask(id) {
+    if (!confirm('确定手动执行此任务？')) return;
+    api(`/admin/api/trigger-task/${id}`, 'POST').then(r => alert(r.msg || '已触发'));
+}
+
+// ==================== 用户管理 ====================
+function loadUsers() {
+    api('/admin/api/users', 'GET').then(users => {
+        const tbody = document.getElementById('users-body');
+        tbody.innerHTML = users.map(u => `<tr>
+            <td>${u.username}</td>
+            <td>${u.role}</td>
+            <td><span class="${u.enabled ? 'toggle-on' : 'toggle-off'}" style="cursor:pointer;" onclick="toggleUserEnabled('${u.username}', ${u.enabled})">${u.enabled ? '启用' : '禁用'}</span></td>
+            <td>${u.created_at || ''}</td>
+            <td>
+                <button class="btn btn-info btn-sm" onclick="showUserModal('${u.username}')">编辑</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.username}')">删除</button>
+            </td>
+        </tr>`).join('');
+    });
+}
+
+function showUserModal(username) {
+    const isEdit = !!username;
+    const load = isEdit ? api('/admin/api/users', 'GET').then(us => us.find(u => u.username === username)) : Promise.resolve(null);
+    load.then(u => {
+        u = u || { username: '', role: 'user', enabled: 1 };
+        document.getElementById('modal-overlay').style.display = 'block';
+        document.getElementById('modal-container').innerHTML = `<div class="modal">
+            <h3>${isEdit ? '编辑' : '新建'}用户</h3>
+            <div class="form-row"><label>用户名</label><input id="u-name" value="${u.username}" ${isEdit ? 'readonly style="background:#eee;"' : ''}></div>
+            <div class="form-row"><label>密码${isEdit ? '（留空不修改）' : ''}</label><input type="password" id="u-pass" value=""></div>
+            <div class="form-row"><label>角色</label><select id="u-role"><option value="user" ${u.role==='user'?'selected':''}>普通用户</option><option value="admin" ${u.role==='admin'?'selected':''}>管理员</option></select></div>
+            <div class="form-row"><label><input type="checkbox" id="u-enabled" ${u.enabled ? 'checked' : ''}> 启用</label></div>
+            <div style="text-align:right;margin-top:15px;">
+                <button class="btn" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveUser(${isEdit ? `'${u.username}'` : 'null'})">${isEdit ? '保存' : '创建'}</button>
+            </div>
+        </div>`;
+    });
+}
+
+function saveUser(username) {
+    const data = {
+        username: document.getElementById('u-name').value,
+        password: document.getElementById('u-pass').value,
+        role: document.getElementById('u-role').value,
+        enabled: document.getElementById('u-enabled').checked,
+    };
+    if (!username) {
+        if (!data.username || !data.password) { alert('用户名和密码不能为空'); return; }
+        api('/admin/api/users', 'POST', data).then(r => { if (r.success) { closeModal(); loadUsers(); } else { alert(r.msg); } });
+    } else {
+        api(`/admin/api/users/${username}`, 'PUT', data).then(r => { if (r.success) { closeModal(); loadUsers(); } else { alert(r.msg); } });
+    }
+}
+
+function deleteUser(username) {
+    if (!confirm(`确定删除用户 ${username}？`)) return;
+    api(`/admin/api/users/${username}`, 'DELETE').then(r => { if (r.success) loadUsers(); else alert(r.msg); });
+}
+
+function toggleUserEnabled(username, current) {
+    api(`/admin/api/users/${username}`, 'PUT', { enabled: !current }).then(r => { if (r.success) loadUsers(); });
+}
+
+// ==================== 权限管理 ====================
+const allPermissions = [
+    { key: 'query', label: '查询数据' },
+    { key: 'download', label: '下载文件' },
+    { key: 'admin', label: '管理页面' },
+    { key: 'trigger_task', label: '触发任务' },
+];
+
+function loadPermissions() {
+    Promise.all([api('/admin/api/users', 'GET'), api('/admin/api/permissions', 'GET')]).then(([users, perms]) => {
+        const container = document.getElementById('permissions-container');
+        container.innerHTML = users.map(u => {
+            const userPerms = perms.filter(p => p.username === u.username).map(p => p.permission);
+            return `<div class="perm-group">
+                <div class="username">${u.username} <span style="color:#999;font-size:12px;">(${u.role})</span></div>
+                <div class="checkbox-group">
+                    ${allPermissions.map(p => `<label><input type="checkbox" data-user="${u.username}" data-perm="${p.key}" ${userPerms.includes(p.key) ? 'checked' : ''}> ${p.label}</label>`).join('')}
+                </div>
+                <button class="btn btn-primary btn-sm" style="margin-top:6px;" onclick="savePermissions('${u.username}')">保存</button>
+            </div>`;
+        }).join('');
+    });
+}
+
+function savePermissions(username) {
+    const perms = Array.from(document.querySelectorAll(`input[data-user="${username}"]:checked`)).map(c => c.dataset.perm);
+    api(`/admin/api/permissions/${username}`, 'PUT', { permissions: perms }).then(r => { if (r.success) alert('权限已保存'); else alert(r.msg); });
+}
+
+
+// ==================== 任务执行记录 ====================
+function loadTaskLogs() {
+    api('/admin/api/task-logs?limit=100', 'GET').then(logs => {
+        const tbody = document.getElementById('task-logs-body');
+        tbody.innerHTML = logs.map(l => {
+            const statusClass = 'status-' + (l.status || 'pending');
+            const statusText = { success:'成功', failed:'失败', running:'执行中', email_failed:'邮件失败' }[l.status] || l.status;
+            return `<tr>
+                <td>${l.id}</td>
+                <td>${l.task_name || ''}</td>
+                <td>${l.username || ''}</td>
+                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                <td style="font-size:12px;">${l.file_path || '-'}</td>
+                <td style="font-size:12px;color:#f44336;">${l.error_message || '-'}</td>
+                <td>${l.created_at || ''}</td>
+            </tr>`;
+        }).join('');
+    });
+}
+
+// ==================== 系统配置 ====================
+function loadConfig() {
+    api('/admin/api/config', 'GET').then(configs => {
+        const tbody = document.getElementById('config-body');
+        tbody.innerHTML = configs.map(c => `<tr>
+            <td><strong>${c.config_key}</strong></td>
+            <td><input class="config-input" data-key="${c.config_key}" value="${c.config_value || ''}" style="width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:3px;${c.config_key.includes('password') ? 'type:password;' : ''}"></td>
+            <td style="font-size:12px;color:#666;">${c.description || ''}</td>
+        </tr>`).join('');
+    });
+}
+
+function saveConfig() {
+    const inputs = document.querySelectorAll('.config-input');
+    const data = Array.from(inputs).map(inp => ({
+        config_key: inp.dataset.key,
+        config_value: inp.value,
+    }));
+    api('/admin/api/config', 'PUT', data).then(r => { if (r.success) alert('配置已保存'); else alert(r.msg || '保存失败'); });
+}
+
+// ==================== 调度器 ====================
+function loadSchedulerStatus() {
+    api('/admin/api/scheduler/status', 'GET').then(data => {
+        const info = document.getElementById('scheduler-info');
+        let html = `<p><strong>运行状态：</strong><span class="${data.running ? 'toggle-on' : 'toggle-off'}">${data.running ? '运行中' : '已停止'}</span></p>`;
+        if (data.jobs && data.jobs.length > 0) {
+            html += '<table><thead><tr><th>任务ID</th><th>任务名称</th><th>下次执行时间</th></tr></thead><tbody>';
+            html += data.jobs.map(j => `<tr><td>${j.id}</td><td>${j.name}</td><td>${j.next_run_time || '无'}</td></tr>`).join('');
+            html += '</tbody></table>';
+        } else {
+            html += '<p style="color:#999;">暂无调度任务</p>';
+        }
+        info.innerHTML = html;
+    });
+}
+
+function reloadScheduler() {
+    if (!confirm('确定重新加载调度器？')) return;
+    api('/admin/api/scheduler/reload', 'POST').then(r => {
+        alert(r.msg || '操作完成');
+        loadSchedulerStatus();
+    });
+}
+
+// ==================== 页面初始化 ====================
+document.addEventListener('DOMContentLoaded', function() {
+    loadEmailTasks();
+});
+</script>
+</body>
+</html>

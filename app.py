@@ -1,7 +1,6 @@
 import os
 from log_config import setup_logging
 import logging
-from logging.handlers import RotatingFileHandler
 
 from flask import Flask, render_template, redirect, url_for, request, session, flash, send_file
 from werkzeug.utils import safe_join
@@ -14,6 +13,10 @@ load_dotenv()
 DOWNLOAD_FOLDER = os.path.abspath('result-files')
 
 from get_excel_data_curr.main import process
+from database.db import Database
+from scheduler.scheduler import SchedulerManager
+from routes.admin import admin_bp
+from routes.auth import login_required
 
 app = Flask(__name__)
 
@@ -21,14 +24,13 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # 配置日志
-setup_logging()  # 多次调用不会重复配置
+setup_logging()
 
-# 从环境变量获取用户凭据
-users = {
-    'admin': os.environ.get('USER_ADMIN_PASSWORD', 'admin123'),
-    'lily': os.environ.get('USER_LILY_PASSWORD', 'lily2025'),
-    'edu': os.environ.get('USER_EDU_PASSWORD', 'edu2025'),
-}
+# 初始化数据库
+db = Database()
+
+# 注册管理页面 Blueprint
+app.register_blueprint(admin_bp)
 
 
 # 登录页面路由
@@ -38,23 +40,17 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        # 安全修复：不再记录密码
         logging.debug(f"Received POST request with username: {username}")
 
-        # 检查用户名是否存在
-        if username not in users:
-            logging.debug(f"Username {username} does not exist")
-            flash('用户名不存在，请先注册。')
+        user = db.verify_user(username, password)
+        if not user:
+            logging.debug(f"Login failed for username: {username}")
+            flash('用户名或密码错误。')
             return redirect(url_for('login'))
 
-        # 验证密码是否正确
-        if not (username in users and users[username] == password):
-            logging.debug(f"Password for username {username} is incorrect")
-            flash('密码错误，请重新输入。')
-            return redirect(url_for('login'))
-
-        # 登录成功，将用户信息存储到会话中
+        # 登录成功
         session['username'] = username
+        session['role'] = user['role']
         logging.debug(f"User {username} logged in successfully")
         flash('登录成功！')
         return redirect(url_for('dashboard'))
@@ -65,16 +61,13 @@ def login():
 
 # 登录后的页面路由
 @app.route('/dashboard')
+@login_required
 def dashboard():
-    logging.debug("Entering dashboard function")
-    # 检查用户是否已登录
-    if 'username' not in session:
-        logging.debug("User not logged in, redirecting to login")
-        flash('请先登录。')
-        return redirect(url_for('login'))
-
-    logging.debug(f"Rendering dashboard.html for user {session['username']}")
-    return render_template('dashboard.html', username=session['username'])
+    username = session['username']
+    user = db.get_user(username)
+    is_admin = user and user['role'] == 'admin'
+    logging.debug(f"Rendering dashboard.html for user {username}")
+    return render_template('dashboard.html', username=username, is_admin=is_admin)
 
 
 # 退出登录路由
@@ -83,6 +76,7 @@ def logout():
     logging.debug("Entering logout function")
     # 从会话中移除用户信息
     session.pop('username', None)
+    session.pop('role', None)
     logging.debug("User logged out")
     flash('已退出登录。')
     return redirect(url_for('login'))
@@ -126,5 +120,14 @@ def download_file(filename):
         return "Invalid request", 400
 
 
+def init_scheduler():
+    """初始化并启动定时调度器"""
+    sm = SchedulerManager(db)
+    app.config['SCHEDULER_MANAGER'] = sm
+    sm.start()
+    return sm
+
+
 if __name__ == '__main__':
+    init_scheduler()
     app.run(host='0.0.0.0', port=80)

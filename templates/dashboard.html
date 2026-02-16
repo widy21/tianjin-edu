@@ -30,7 +30,7 @@
 </head>
 <body>
 <div class="dashboard-container">
-    <h2 style='font-size:16px'>欢迎，{{ username }}！这是您的个人页面。<a href="{{ url_for('logout') }}"  style='color:red;weight:500;'>退出登录</a></h2>
+    <h2 style='font-size:16px'>欢迎，{{ username }}！这是您的个人页面。{% if is_admin %}<a href="{{ url_for('admin.admin_page') }}" style='color:#2196F3;weight:500;margin-left:10px;'>系统管理</a>{% endif %}<a href="{{ url_for('logout') }}"  style='color:red;weight:500;'>退出登录</a></h2>
     <p style='color:blue;weight:500;'>2025-12-04更新日志：新增西院公寓（13-17B栋）；新增全选/反选按钮；按钮防重复点击。</p>
     <p style='color:blue;weight:500;'>2025-05-30更新日志：导出数据中只保留每个学生最晚打卡记录。</p>
     <p style='color:blue;weight:500;'>2025-05-29更新日志：支持不同用户同时操作。</p>
