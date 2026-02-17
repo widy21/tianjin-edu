@@ -26,7 +26,7 @@
             z-index: 100;
         }
         .top-bar .logo {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 600;
             color: #1a1a1a;
         }
@@ -37,12 +37,12 @@
             gap: 16px;
         }
         .top-bar .user-name {
-            font-size: 14px;
+            font-size: 15px;
             color: #666;
         }
         .top-bar .user-name strong { color: #333; }
         .top-bar a.action-link {
-            font-size: 13px;
+            font-size: 14px;
             text-decoration: none;
             padding: 6px 14px;
             border-radius: 4px;
@@ -73,13 +73,13 @@
             padding: 12px 16px;
             margin-bottom: 16px;
             border-left: 3px solid #2196F3;
-            font-size: 12px;
+            font-size: 13px;
             color: #666;
             cursor: pointer;
             user-select: none;
         }
         .changelog summary {
-            font-size: 13px;
+            font-size: 14px;
             color: #999;
             outline: none;
         }
@@ -94,7 +94,7 @@
             margin-bottom: 16px;
         }
         .card-title {
-            font-size: 15px;
+            font-size: 16px;
             font-weight: 600;
             color: #333;
             margin-bottom: 16px;
@@ -110,7 +110,7 @@
             gap: 10px;
         }
         .building-label {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 600;
             padding: 4px 10px;
             border-radius: 4px;
@@ -121,7 +121,7 @@
         .building-label.zhongyuan { background: #E3F2FD; color: #1565C0; }
         .building-label.xiyuan { background: #E8F5E9; color: #2E7D32; }
         .toggle-btn {
-            font-size: 12px;
+            font-size: 13px;
             padding: 3px 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
@@ -143,7 +143,7 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            font-size: 13px;
+            font-size: 14px;
             color: #555;
             cursor: pointer;
             padding: 3px 0;
@@ -155,7 +155,7 @@
             cursor: pointer;
         }
         .selected-info {
-            font-size: 13px;
+            font-size: 14px;
             color: #4CAF50;
             font-weight: 500;
             margin-top: 8px;
@@ -169,7 +169,7 @@
             align-items: center;
         }
         .time-row label {
-            font-size: 13px;
+            font-size: 14px;
             color: #666;
             margin-right: 6px;
         }
@@ -186,7 +186,7 @@
 
         /* 下载区 */
         .download-area {
-            font-size: 13px;
+            font-size: 14px;
             color: #666;
             min-height: 24px;
         }
@@ -205,10 +205,10 @@
             margin-top: 20px;
         }
         .btn {
-            padding: 9px 32px;
+            padding: 10px 36px;
             border: none;
             border-radius: 6px;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
@@ -238,6 +238,7 @@
     <!-- 更新日志 -->
     <details class="changelog">
         <summary>📋 更新日志</summary>
+        <p>2026-02-17：新增自动定时邮件任务（支持Cron表达式配置）；新增系统管理后台（用户管理、权限配置、楼栋权限、邮件任务、系统配置、操作日志）；支持按用户分配可操作楼栋。</p>
         <p>2025-12-04：新增西院公寓（13-17B栋）；新增全选/反选按钮；按钮防重复点击。</p>
         <p>2025-05-30：导出数据中只保留每个学生最晚打卡记录。</p>
         <p>2025-05-29：支持不同用户同时操作。</p>
@@ -248,43 +249,62 @@
         <div class="card">
             <div class="card-title">
                 公寓楼栋选择
-                <button type="button" class="toggle-btn" onclick="toggleAllBuildings()" style="float:right;">全选/反选</button>
+                {% if has_admin_perm %}<button type="button" class="toggle-btn" onclick="toggleAllBuildings()" style="float:right;">全选/反选</button>{% endif %}
             </div>
 
+            {% set zy_buildings = [] %}
+            {% for i in range(14) %}
+                {% if not allowed_buildings or (i+1)|string in allowed_buildings %}
+                    {% if zy_buildings.append(i+1) %}{% endif %}
+                {% endif %}
+            {% endfor %}
+            {% set xy_buildings = [] %}
+            {% set xy_map = {15:'13栋', 16:'14栋', 17:'15栋', 18:'16栋', 19:'17A栋', 20:'17B栋'} %}
+            {% for v in [15,16,17,18,19,20] %}
+                {% if not allowed_buildings or v|string in allowed_buildings %}
+                    {% if xy_buildings.append(v) %}{% endif %}
+                {% endif %}
+            {% endfor %}
+
             <!-- 中院 -->
+            {% if zy_buildings %}
             <div class="building-section">
                 <span class="building-label zhongyuan">中院</span>
-                <button type="button" class="toggle-btn" onclick="toggleZhongyuan()">全选/反选</button>
+                {% if has_admin_perm %}<button type="button" class="toggle-btn" onclick="toggleZhongyuan()">全选/反选</button>{% endif %}
                 <div class="checkbox-grid" id="zhongyuan-buildings">
                     {% for i in range(14) %}
-                        {% if i == 10 %}
-                            <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> 11A栋</label>
-                        {% elif i == 11 %}
-                            <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> 11B栋</label>
-                        {% elif i == 12 %}
-                            <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> 12A栋</label>
-                        {% elif i == 13 %}
-                            <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> 12B栋</label>
-                        {% else %}
-                            <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> {{ i+1 }}栋</label>
+                        {% if not allowed_buildings or (i+1)|string in allowed_buildings %}
+                            {% if i == 10 %}
+                                <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> 11A栋</label>
+                            {% elif i == 11 %}
+                                <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> 11B栋</label>
+                            {% elif i == 12 %}
+                                <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> 12A栋</label>
+                            {% elif i == 13 %}
+                                <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> 12B栋</label>
+                            {% else %}
+                                <label><input type="checkbox" name="building" value="{{ i+1 }}" onchange="updateSelectedBuildings()"> {{ i+1 }}栋</label>
+                            {% endif %}
                         {% endif %}
                     {% endfor %}
                 </div>
             </div>
+            {% endif %}
 
             <!-- 西院 -->
+            {% if xy_buildings %}
             <div class="building-section">
                 <span class="building-label xiyuan">西院</span>
-                <button type="button" class="toggle-btn" onclick="toggleXiyuan()">全选/反选</button>
+                {% if has_admin_perm %}<button type="button" class="toggle-btn" onclick="toggleXiyuan()">全选/反选</button>{% endif %}
                 <div class="checkbox-grid" id="xiyuan-buildings">
-                    <label><input type="checkbox" name="building" value="15" onchange="updateSelectedBuildings()"> 13栋</label>
-                    <label><input type="checkbox" name="building" value="16" onchange="updateSelectedBuildings()"> 14栋</label>
-                    <label><input type="checkbox" name="building" value="17" onchange="updateSelectedBuildings()"> 15栋</label>
-                    <label><input type="checkbox" name="building" value="18" onchange="updateSelectedBuildings()"> 16栋</label>
-                    <label><input type="checkbox" name="building" value="19" onchange="updateSelectedBuildings()"> 17A栋</label>
-                    <label><input type="checkbox" name="building" value="20" onchange="updateSelectedBuildings()"> 17B栋</label>
+                    {% for v in [15,16,17,18,19,20] %}
+                        {% if not allowed_buildings or v|string in allowed_buildings %}
+                            <label><input type="checkbox" name="building" value="{{ v }}" onchange="updateSelectedBuildings()"> {{ xy_map[v] }}</label>
+                        {% endif %}
+                    {% endfor %}
                 </div>
             </div>
+            {% endif %}
 
             <div class="selected-info" id="selectedBuildings"></div>
         </div>

@@ -68,8 +68,10 @@ def dashboard():
     username = session['username']
     user = db.get_user(username)
     is_admin = user and user['role'] == 'admin'
+    has_admin_perm = db.has_permission(username, 'admin')  # 是否有"管理页面"权限
+    allowed_buildings = db.get_user_buildings(username)  # 空列表表示全部
     logging.debug(f"Rendering dashboard.html for user {username}")
-    return render_template('dashboard.html', username=username, is_admin=is_admin)
+    return render_template('dashboard.html', username=username, is_admin=is_admin, has_admin_perm=has_admin_perm, allowed_buildings=allowed_buildings)
 
 
 # 退出登录路由
@@ -100,6 +102,13 @@ def query():
         data = request.json
         logging.debug(f"Received POST request with data: {data}")
         username = session.get('username', '')
+        # 校验楼栋权限
+        allowed = db.get_user_buildings(username)
+        if allowed:
+            requested = data.get('buildings', [])
+            data['buildings'] = [b for b in requested if b in allowed]
+            if not data['buildings']:
+                return {'status': 'error', 'message': '没有可操作的楼栋权限'}
         buildings = ','.join(data.get('buildings', []))
         db.create_operation_log(username, 'query', f'查询楼栋: {buildings}', request.remote_addr)
         # 加工数据

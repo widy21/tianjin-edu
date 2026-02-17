@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     password TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'user',  -- admin / user
     enabled INTEGER NOT NULL DEFAULT 1,
+    allowed_buildings TEXT DEFAULT '',   -- 可操作楼栋，JSON数组如 ["1","4","5"]，空字符串表示全部
     created_at TIMESTAMP DEFAULT (datetime('now','localtime')),
     updated_at TIMESTAMP DEFAULT (datetime('now','localtime'))
 );

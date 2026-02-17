@@ -32,6 +32,12 @@ class Database:
         try:
             conn.executescript(schema_sql)
             conn.commit()
+            # 迁移：为已有 users 表添加 allowed_buildings 字段
+            columns = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
+            if 'allowed_buildings' not in columns:
+                conn.execute("ALTER TABLE users ADD COLUMN allowed_buildings TEXT DEFAULT ''")
+                conn.commit()
+                self.logger.info("已为 users 表添加 allowed_buildings 字段")
         finally:
             conn.close()
 
@@ -60,7 +66,7 @@ class Database:
         return None
 
     def update_user(self, username, **kwargs):
-        allowed = {'password', 'role', 'enabled'}
+        allowed = {'password', 'role', 'enabled', 'allowed_buildings'}
         fields = {k: v for k, v in kwargs.items() if k in allowed}
         if not fields:
             return False
@@ -76,6 +82,24 @@ class Database:
             return True
         finally:
             conn.close()
+
+    def get_user_buildings(self, username):
+        """获取用户可操作的楼栋列表，返回列表；空列表表示全部可操作"""
+        user = self.get_user(username)
+        if not user:
+            return []
+        val = user.get('allowed_buildings', '')
+        if not val:
+            return []  # 空表示全部
+        try:
+            return json.loads(val)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def set_user_buildings(self, username, buildings):
+        """设置用户可操作的楼栋列表，空列表表示全部可操作"""
+        val = json.dumps(buildings) if buildings else ''
+        return self.update_user(username, allowed_buildings=val)
 
     def create_user(self, username, password, role='user'):
         conn = self._get_conn()

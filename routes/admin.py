@@ -107,6 +107,24 @@ def set_user_perms(username):
     return jsonify({'success': True})
 
 
+@admin_bp.route('/api/buildings/<username>', methods=['GET'])
+@admin_required
+def get_user_buildings(username):
+    buildings = db.get_user_buildings(username)
+    return jsonify({'username': username, 'buildings': buildings})
+
+
+@admin_bp.route('/api/buildings/<username>', methods=['PUT'])
+@admin_required
+def set_user_buildings(username):
+    data = request.json
+    buildings = data.get('buildings', [])
+    db.set_user_buildings(username, buildings)
+    bld_str = ','.join(buildings) if buildings else '全部'
+    _log_operation('update_buildings', f'修改楼栋权限: {username}, 楼栋: {bld_str}')
+    return jsonify({'success': True})
+
+
 def _try_reload_scheduler():
     """尝试重新加载调度器（邮件任务变更后自动调用）"""
     try:

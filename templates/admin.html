@@ -9,7 +9,8 @@
         .header h2 { margin: 0; }
         .header a { color: red; text-decoration: none; margin-left: 15px; }
         .tabs { display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid #4CAF50; }
-        .tab-btn { padding: 10px 24px; border: 1px solid #ddd; border-bottom: none; background: #e8e8e8; cursor: pointer; font-size: 14px; border-radius: 6px 6px 0 0; margin-right: 2px; }
+        .tab-btn { padding: 10px 24px; border: 1px solid #ddd; border-bottom: none; background: #e8e8e8; color: #333; cursor: pointer; font-size: 14px; border-radius: 6px 6px 0 0; margin-right: 2px; }
+        .tab-btn:hover { background: #d5d5d5; }
         .tab-btn.active { background: #4CAF50; color: white; border-color: #4CAF50; }
         .tab-content { display: none; background: white; padding: 20px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 6px 6px; }
         .tab-content.active { display: block; }
@@ -491,15 +492,59 @@ const allPermissions = [
     { key: 'trigger_task', label: '触发任务' },
 ];
 
+const allBuildings = [
+    { value: '1', label: '1栋', group: '中院' },
+    { value: '2', label: '2栋', group: '中院' },
+    { value: '3', label: '3栋', group: '中院' },
+    { value: '4', label: '4栋', group: '中院' },
+    { value: '5', label: '5栋', group: '中院' },
+    { value: '6', label: '6栋', group: '中院' },
+    { value: '7', label: '7栋', group: '中院' },
+    { value: '8', label: '8栋', group: '中院' },
+    { value: '9', label: '9栋', group: '中院' },
+    { value: '10', label: '10栋', group: '中院' },
+    { value: '11', label: '11A栋', group: '中院' },
+    { value: '12', label: '11B栋', group: '中院' },
+    { value: '13', label: '12A栋', group: '中院' },
+    { value: '14', label: '12B栋', group: '中院' },
+    { value: '15', label: '13栋', group: '西院' },
+    { value: '16', label: '14栋', group: '西院' },
+    { value: '17', label: '15栋', group: '西院' },
+    { value: '18', label: '16栋', group: '西院' },
+    { value: '19', label: '17A栋', group: '西院' },
+    { value: '20', label: '17B栋', group: '西院' },
+];
+
 function loadPermissions() {
-    Promise.all([api('/admin/api/users', 'GET'), api('/admin/api/permissions', 'GET')]).then(([users, perms]) => {
+    api('/admin/api/users', 'GET').then(users => {
+        const permPromises = users.map(u => api(`/admin/api/permissions/${u.username}`, 'GET'));
+        const bldPromises = users.map(u => api(`/admin/api/buildings/${u.username}`, 'GET'));
+        return Promise.all([Promise.resolve(users), api('/admin/api/permissions', 'GET'), Promise.all(bldPromises)]);
+    }).then(([users, perms, bldResults]) => {
         const container = document.getElementById('permissions-container');
-        container.innerHTML = users.map(u => {
+        container.innerHTML = users.map((u, idx) => {
             const userPerms = perms.filter(p => p.username === u.username).map(p => p.permission);
+            const userBlds = bldResults[idx].buildings || [];
+            const isAllBuildings = userBlds.length === 0;
+            const zhongyuan = allBuildings.filter(b => b.group === '中院');
+            const xiyuan = allBuildings.filter(b => b.group === '西院');
             return `<div class="perm-group">
                 <div class="username">${u.username} <span style="color:#999;font-size:12px;">(${u.role})</span></div>
-                <div class="checkbox-group">
-                    ${allPermissions.map(p => `<label><input type="checkbox" data-user="${u.username}" data-perm="${p.key}" ${userPerms.includes(p.key) ? 'checked' : ''}> ${p.label}</label>`).join('')}
+                <div style="margin-bottom:8px;">
+                    <span style="font-size:12px;color:#666;font-weight:bold;">功能权限：</span>
+                    <div class="checkbox-group" style="margin-top:4px;">
+                        ${allPermissions.map(p => `<label><input type="checkbox" data-user="${u.username}" data-perm="${p.key}" ${userPerms.includes(p.key) ? 'checked' : ''}> ${p.label}</label>`).join('')}
+                    </div>
+                </div>
+                <div style="margin-bottom:8px;">
+                    <span style="font-size:12px;color:#666;font-weight:bold;">楼栋权限：</span>
+                    <label style="font-size:12px;margin-left:8px;"><input type="checkbox" data-user="${u.username}" data-allbld ${isAllBuildings ? 'checked' : ''} onchange="toggleAllBld('${u.username}', this.checked)"> 全部楼栋</label>
+                    <div id="bld-grid-${u.username}" class="checkbox-group" style="margin-top:4px;${isAllBuildings ? 'display:none;' : ''}">
+                        <span style="font-size:11px;color:#1565C0;font-weight:bold;margin-right:4px;">中院:</span>
+                        ${zhongyuan.map(b => `<label><input type="checkbox" data-user="${u.username}" data-bld="${b.value}" ${isAllBuildings || userBlds.includes(b.value) ? 'checked' : ''}> ${b.label}</label>`).join('')}
+                        <span style="font-size:11px;color:#2E7D32;font-weight:bold;margin-left:8px;margin-right:4px;">西院:</span>
+                        ${xiyuan.map(b => `<label><input type="checkbox" data-user="${u.username}" data-bld="${b.value}" ${isAllBuildings || userBlds.includes(b.value) ? 'checked' : ''}> ${b.label}</label>`).join('')}
+                    </div>
                 </div>
                 <button class="btn btn-primary btn-sm" style="margin-top:6px;" onclick="savePermissions('${u.username}')">保存</button>
             </div>`;
@@ -507,9 +552,25 @@ function loadPermissions() {
     });
 }
 
+function toggleAllBld(username, checked) {
+    const grid = document.getElementById('bld-grid-' + username);
+    grid.style.display = checked ? 'none' : 'flex';
+    if (checked) {
+        grid.querySelectorAll('input[data-bld]').forEach(cb => cb.checked = true);
+    }
+}
+
 function savePermissions(username) {
-    const perms = Array.from(document.querySelectorAll(`input[data-user="${username}"]:checked`)).map(c => c.dataset.perm);
-    api(`/admin/api/permissions/${username}`, 'PUT', { permissions: perms }).then(r => { if (r.success) alert('权限已保存'); else alert(r.msg); });
+    const perms = Array.from(document.querySelectorAll(`input[data-user="${username}"][data-perm]:checked`)).map(c => c.dataset.perm);
+    const isAllBld = document.querySelector(`input[data-user="${username}"][data-allbld]`).checked;
+    const buildings = isAllBld ? [] : Array.from(document.querySelectorAll(`input[data-user="${username}"][data-bld]:checked`)).map(c => c.dataset.bld);
+    Promise.all([
+        api(`/admin/api/permissions/${username}`, 'PUT', { permissions: perms }),
+        api(`/admin/api/buildings/${username}`, 'PUT', { buildings: buildings })
+    ]).then(([r1, r2]) => {
+        if (r1.success && r2.success) alert('权限已保存');
+        else alert('保存失败');
+    });
 }
 
 
@@ -610,7 +671,7 @@ function loadOperationLogs() {
             'login': '登录', 'logout': '登出', 'login_failed': '登录失败',
             'query': '查询数据', 'download': '下载文件',
             'create_user': '创建用户', 'update_user': '修改用户', 'delete_user': '删除用户',
-            'update_permissions': '修改权限',
+            'update_permissions': '修改权限', 'update_buildings': '修改楼栋权限',
             'create_email_task': '创建邮件任务', 'update_email_task': '修改邮件任务', 'delete_email_task': '删除邮件任务',
             'trigger_task': '触发任务', 'update_config': '更新配置', 'reload_scheduler': '重载调度器'
         };
