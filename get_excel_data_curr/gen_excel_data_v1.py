@@ -8,7 +8,6 @@ from openpyxl.styles import Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 from collections import defaultdict
 from operator import itemgetter
-from get_excel_data_curr.ConfigTool import ConfigTool
 
 setup_logging()  # 多次调用不会重复配置
 
@@ -66,7 +65,15 @@ def convert_building_show(bid):
     else:
         return str(bid)
 
-def gen_excel_data_v1(ret_dict, username):
+def gen_excel_data_v1(ret_dict, username, data_cfg=None):
+    """
+    生成 Excel 晚归数据文件。
+    :param ret_dict: 各楼栋的晚归数据
+    :param username: 用户名（用于文件路径）
+    :param data_cfg: 学院名称映射字典，从调用方传入
+    """
+    if data_cfg is None:
+        data_cfg = {}
     if len(ret_dict) == 0:
         logging.debug('ret_dict is None')
         return
@@ -118,8 +125,6 @@ def gen_excel_data_v1(ret_dict, username):
         # 学院列
         start = row['schoolInstituteName'][0:2]  # 开头的字符
         end = row['schoolInstituteName'][-2:]  # 结尾的字符
-        config_tool = ConfigTool("./get_excel_data_curr/config.json")
-        data_cfg = config_tool.get_data_cfg()
         if row['schoolInstituteName'] in data_cfg:
             new_value = data_cfg[row['schoolInstituteName']]
         else:

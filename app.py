@@ -45,6 +45,7 @@ def login():
         user = db.verify_user(username, password)
         if not user:
             logging.debug(f"Login failed for username: {username}")
+            db.create_operation_log(username, 'login_failed', '用户名或密码错误', request.remote_addr)
             flash('用户名或密码错误。')
             return redirect(url_for('login'))
 
@@ -52,6 +53,7 @@ def login():
         session['username'] = username
         session['role'] = user['role']
         logging.debug(f"User {username} logged in successfully")
+        db.create_operation_log(username, 'login', '登录成功', request.remote_addr)
         flash('登录成功！')
         return redirect(url_for('dashboard'))
 
@@ -74,6 +76,9 @@ def dashboard():
 @app.route('/logout')
 def logout():
     logging.debug("Entering logout function")
+    username = session.get('username')
+    if username:
+        db.create_operation_log(username, 'logout', '退出登录', request.remote_addr)
     # 从会话中移除用户信息
     session.pop('username', None)
     session.pop('role', None)
@@ -94,6 +99,9 @@ def query():
     if request.method == 'POST':
         data = request.json
         logging.debug(f"Received POST request with data: {data}")
+        username = session.get('username', '')
+        buildings = ','.join(data.get('buildings', []))
+        db.create_operation_log(username, 'query', f'查询楼栋: {buildings}', request.remote_addr)
         # 加工数据
         result = process(data)
         logging.debug(f"Processed result: {result}")
@@ -112,6 +120,8 @@ def download_file(filename):
             logging.debug(f"File {safe_path} not found")
             return "File not found", 404
 
+        username = session.get('username', '')
+        db.create_operation_log(username, 'download', f'下载文件: {clean_filename}', request.remote_addr)
         logging.debug(f"Sending file: {safe_path}")
         return send_file(safe_path, as_attachment=True)
 

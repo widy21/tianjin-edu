@@ -1,4 +1,3 @@
-import sys
 import traceback
 import logging
 from datetime import datetime
@@ -10,20 +9,17 @@ from selenium.common.exceptions import NoSuchElementException, TimeoutException
 import get_excel_data_curr.t3 as t3
 from get_excel_data_curr.ConfigTool import ConfigTool
 from get_excel_data_curr.gen_excel_data_v1 import gen_excel_data_v1
-# from gen_excel_data import gen_excel_data
 from selenium.webdriver.chrome.service import Service
+from database.db import Database
 
-config_tool = ConfigTool("./get_excel_data_curr/config.json")
 
-# 登录信息
-username = config_tool.get_username()
-password = config_tool.get_password()
+def _get_config_tool():
+    """创建 Database 和 ConfigTool 实例"""
+    db = Database()
+    return ConfigTool(db)
 
-if username == '' or password == '':
-    print('用户信息为空，请检查配置')
-    sys.exit(-1)
 
-def verify():
+def verify(config_tool):
     # 获取当前日期
     current_date = datetime.now().date()
     # 定义目标日期
@@ -32,22 +28,33 @@ def verify():
     # 比较当前日期和目标日期
     if config_tool.get_flag() != 'whosyourdady':
         if current_date <= target_date:
-            # print(f"当前日期 {current_date} 小于等于目标日期 {target_date}")
             pass
         else:
             logging.debug(f"当前日期 {current_date} 大于目标日期 {target_date}，请注册后使用")
 
+
 def process(data=None):
-    verify()
+    # 从数据库读取配置
+    config_tool = _get_config_tool()
+
+    # 登录信息
+    username = config_tool.get_username()
+    password = config_tool.get_password()
+
+    if username == '' or password == '':
+        return {
+            'msg': '公寓系统用户信息为空，请在管理页面检查配置',
+            'status': 'false',
+        }
+
+    verify(config_tool)
 
     # 登录 URL
     login_url = "http://gygl.tust.edu.cn:8080/da-roadgate-resident/index  "
     # 设置 Chrome 选项
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless")  # 无头模式，暂时注释以便调试
-    #options.add_argument("--start-maximized")  # 最大化窗口
+    options.add_argument("--headless")  # 无头模式
     options.add_argument("--disable-gpu")  # 禁用 GPU 加速
-    #options.add_argument("--window-size=1920,1080")  # 设置窗口大小
     options.add_argument("--no-sandbox")
     options.add_argument('--disable-dev-shm-usage')
 
@@ -74,7 +81,10 @@ def process(data=None):
         except TimeoutException:
             print("等待超时，页面加载缓慢或网络问题。")
             driver.quit()
-            exit()
+            return {
+                'msg': '等待超时，页面加载缓慢或网络问题。',
+                'status': 'false',
+            }
 
         # 输入用户名
         driver.find_element(By.NAME, "username").send_keys(username)
@@ -94,7 +104,10 @@ def process(data=None):
                 except NoSuchElementException:
                     print("无法找到登录按钮，请检查页面的 HTML 结构。")
                     driver.quit()
-                    exit()
+                    return {
+                        'msg': '无法找到登录按钮，请检查页面的 HTML 结构。',
+                        'status': 'false',
+                    }
 
         # 等待页面加载完成
         try:
@@ -103,38 +116,30 @@ def process(data=None):
 
             # 获取当前页面的所有 cookie
             cookies = driver.get_cookies()
-            # 将 cookie 添加到请求头中
-            # cookie_str = "; ".join([f"{cookie['name']}={cookie['value']}" for cookie in cookies])
             value_ = cookies[0]['value']
-            # print(f"cookie_str: {value_}")
 
             bid_dict = config_tool.get_bid_dict()
             new_bid_dict = {}
             for idx in data['buildings']:
                 new_bid_dict[idx] = bid_dict[idx]
 
+            # 从配置获取 page_size 和 data_cfg，传递给子模块
+            page_size = config_tool.get_pagesize()
+            data_cfg = config_tool.get_data_cfg()
+
             # 循环查n个公寓数据
             print("数据处理中，具体进度如下：")
             ret_dict = {}
             for b_num, bid in new_bid_dict.items():
-                ret_data = t3.deal(value_, bid, b_num, data)
+                ret_data = t3.deal(value_, bid, b_num, data, page_size=page_size)
                 ret_dict[b_num] = ret_data
 
             # 生成excel数据
-            file_name = gen_excel_data_v1(ret_dict, data['username'])
-
-            # 关闭浏览器
-            # driver.quit()
-
-            # 点击出入安全按钮
-            # img_button = WebDriverWait(driver, 10).until(
-            #     EC.element_to_be_clickable((By.CSS_SELECTOR, "img[src='resources/images/application/webos/rg.png']"))
-            # )
-            # img_button.click()
+            file_name = gen_excel_data_v1(ret_dict, data['username'], data_cfg=data_cfg)
 
             return {
-                'file_name':file_name,
-                'status':'success',
+                'file_name': file_name,
+                'status': 'success',
             }
 
         except TimeoutException:
@@ -146,14 +151,11 @@ def process(data=None):
                 'status': 'success',
             }
 
-        # 保持浏览器打开，方便调试
-        # input("按任意键关闭...")
-
     except Exception as e:
         traceback.print_exc()
         print(f"处理失败: {e}")
         return {
-            'msg': e,
+            'msg': str(e),
             'status': 'false',
         }
 

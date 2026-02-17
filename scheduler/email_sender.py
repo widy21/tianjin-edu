@@ -56,12 +56,17 @@ class EmailSender:
                         part['Content-Disposition'] = f'attachment; filename="{filename}"'
                         msg.attach(part)
 
-            # 发送
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                if self.use_tls:
-                    server.starttls()
-                server.login(self.sender_email, self.sender_password)
-                server.send_message(msg)
+            # 发送：端口465用SSL，端口587用STARTTLS
+            if self.smtp_port == 465:
+                with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port) as server:
+                    server.login(self.sender_email, self.sender_password)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                    if self.use_tls:
+                        server.starttls()
+                    server.login(self.sender_email, self.sender_password)
+                    server.send_message(msg)
 
             self.logger.info(f"邮件发送成功: {recipients}")
             return True, "邮件发送成功"

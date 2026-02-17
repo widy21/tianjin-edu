@@ -1,11 +1,21 @@
 import logging
-from flask import Blueprint, render_template, request, session, jsonify
+from flask import Blueprint, render_template, request, session, jsonify, current_app
 from database.db import Database
 from routes.auth import admin_required
 from scheduler.task_manager import TaskManager
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 db = Database()
+
+
+def _log_operation(action, detail=None):
+    """记录当前用户的操作日志"""
+    try:
+        username = session.get('username', '')
+        ip = request.remote_addr
+        db.create_operation_log(username, action, detail, ip)
+    except Exception:
+        pass
 
 
 # ==================== 管理页面 ====================
@@ -40,6 +50,7 @@ def create_user():
     ok = db.create_user(username, password, role)
     if not ok:
         return jsonify({'success': False, 'msg': '用户名已存在'}), 400
+    _log_operation('create_user', f'创建用户: {username}, 角色: {role}')
     return jsonify({'success': True})
 
 
@@ -55,6 +66,10 @@ def update_user(username):
     if 'enabled' in data:
         kwargs['enabled'] = 1 if data['enabled'] else 0
     db.update_user(username, **kwargs)
+    changes = ', '.join(f'{k}' for k in kwargs if k != 'password')
+    if 'password' in kwargs:
+        changes = ('密码, ' + changes) if changes else '密码'
+    _log_operation('update_user', f'修改用户: {username}, 变更: {changes}')
     return jsonify({'success': True})
 
 
@@ -64,6 +79,7 @@ def delete_user(username):
     if username == session.get('username'):
         return jsonify({'success': False, 'msg': '不能删除当前登录用户'}), 400
     db.delete_user(username)
+    _log_operation('delete_user', f'删除用户: {username}')
     return jsonify({'success': True})
 
 
@@ -87,7 +103,18 @@ def set_user_perms(username):
     data = request.json
     permissions = data.get('permissions', [])
     db.set_user_permissions(username, permissions)
+    _log_operation('update_permissions', f'修改权限: {username}, 权限: {",".join(permissions)}')
     return jsonify({'success': True})
+
+
+def _try_reload_scheduler():
+    """尝试重新加载调度器（邮件任务变更后自动调用）"""
+    try:
+        sm = current_app.config.get('SCHEDULER_MANAGER')
+        if sm:
+            sm.reload()
+    except Exception as e:
+        logging.getLogger(__name__).warning(f'自动重新加载调度器失败: {e}')
 
 
 # ==================== 邮件任务配置 API ====================
@@ -113,6 +140,8 @@ def create_email_task():
         cron_expression=data.get('cron_expression', '0 6 * * *'),
         enabled=1 if data.get('enabled', True) else 0,
     )
+    _try_reload_scheduler()
+    _log_operation('create_email_task', f'创建邮件任务: {data.get("task_name", "")}')
     return jsonify({'success': True, 'id': task_id})
 
 
@@ -128,6 +157,8 @@ def update_email_task(task_id):
     if 'enabled' in data:
         kwargs['enabled'] = 1 if data['enabled'] else 0
     db.update_email_task(task_id, **kwargs)
+    _try_reload_scheduler()
+    _log_operation('update_email_task', f'修改邮件任务: id={task_id}')
     return jsonify({'success': True})
 
 
@@ -135,6 +166,8 @@ def update_email_task(task_id):
 @admin_required
 def delete_email_task(task_id):
     db.delete_email_task(task_id)
+    _try_reload_scheduler()
+    _log_operation('delete_email_task', f'删除邮件任务: id={task_id}')
     return jsonify({'success': True})
 
 
@@ -149,6 +182,7 @@ def trigger_task(task_id):
     try:
         tm = TaskManager(db)
         tm.execute_single_task(task)
+        _log_operation('trigger_task', f'手动触发任务: {task["task_name"]}')
         return jsonify({'success': True, 'msg': '任务已触发执行'})
     except Exception as e:
         logging.error(f"手动触发任务失败: {str(e)}")
@@ -180,6 +214,7 @@ def update_config():
     data = request.json
     for item in data:
         db.set_config(item['config_key'], item['config_value'], item.get('description'))
+    _log_operation('update_config', f'更新系统配置: {len(data)}项')
     return jsonify({'success': True})
 
 
@@ -188,7 +223,6 @@ def update_config():
 @admin_bp.route('/api/scheduler/status', methods=['GET'])
 @admin_required
 def scheduler_status():
-    from flask import current_app
     sm = current_app.config.get('SCHEDULER_MANAGER')
     if not sm:
         return jsonify({'running': False, 'jobs': []})
@@ -201,10 +235,21 @@ def scheduler_status():
 @admin_bp.route('/api/scheduler/reload', methods=['POST'])
 @admin_required
 def scheduler_reload():
-    from flask import current_app
     sm = current_app.config.get('SCHEDULER_MANAGER')
     if sm:
         sm.reload()
+        _log_operation('reload_scheduler', '重新加载调度器')
         return jsonify({'success': True, 'msg': '调度器已重新加载'})
     return jsonify({'success': False, 'msg': '调度器未初始化'}), 500
 
+
+
+# ==================== 操作日志 API ====================
+
+@admin_bp.route('/api/operation-logs', methods=['GET'])
+@admin_required
+def get_operation_logs():
+    limit = request.args.get('limit', 100, type=int)
+    username = request.args.get('username', None)
+    logs = db.get_operation_logs(limit=limit, username=username)
+    return jsonify(logs)

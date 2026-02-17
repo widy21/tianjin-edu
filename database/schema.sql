@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
     password TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'user',  -- admin / user
     enabled INTEGER NOT NULL DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT (datetime('now','localtime')),
+    updated_at TIMESTAMP DEFAULT (datetime('now','localtime'))
 );
 
 -- 系统配置表（键值对，替代 .env 和 config.json 中的非敏感配置）
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS system_config (
     config_key TEXT NOT NULL UNIQUE,
     config_value TEXT NOT NULL,
     description TEXT,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT (datetime('now','localtime'))
 );
 
 -- 邮件任务配置表（每个账号的定时邮件任务）
@@ -34,8 +34,8 @@ CREATE TABLE IF NOT EXISTS email_tasks (
     end_time TEXT DEFAULT '05:30:00',
     cron_expression TEXT DEFAULT '0 6 * * *',  -- 每天早上6点
     enabled INTEGER NOT NULL DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT (datetime('now','localtime')),
+    updated_at TIMESTAMP DEFAULT (datetime('now','localtime'))
 );
 
 -- 任务执行记录表
@@ -46,8 +46,8 @@ CREATE TABLE IF NOT EXISTS task_logs (
     status TEXT NOT NULL DEFAULT 'pending',  -- pending/running/success/failed/email_failed
     file_path TEXT,
     error_message TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT (datetime('now','localtime')),
+    updated_at TIMESTAMP DEFAULT (datetime('now','localtime')),
     FOREIGN KEY (email_task_id) REFERENCES email_tasks(id)
 );
 
@@ -57,7 +57,17 @@ CREATE TABLE IF NOT EXISTS permissions (
     username TEXT NOT NULL,
     permission TEXT NOT NULL,            -- 权限标识：query, download, admin, trigger_task
     enabled INTEGER NOT NULL DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT (datetime('now','localtime')),
     UNIQUE(username, permission)
+);
+
+-- 操作日志表（记录用户登录和操作行为）
+CREATE TABLE IF NOT EXISTS operation_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,                        -- 操作用户（登录失败时可能为空或为尝试的用户名）
+    action TEXT NOT NULL,                 -- 操作类型：login/logout/login_failed/query/download/create_user/...
+    detail TEXT,                          -- 操作详情（JSON 或文本描述）
+    ip_address TEXT,                      -- 客户端 IP 地址
+    created_at TIMESTAMP DEFAULT (datetime('now','localtime'))
 );
 

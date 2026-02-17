@@ -69,7 +69,7 @@ class Database:
         conn = self._get_conn()
         try:
             conn.execute(
-                f"UPDATE users SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE username = ?",
+                f"UPDATE users SET {set_clause}, updated_at = datetime('now','localtime') WHERE username = ?",
                 values
             )
             conn.commit()
@@ -129,7 +129,7 @@ class Database:
             ).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE system_config SET config_value = ?, updated_at = CURRENT_TIMESTAMP WHERE config_key = ?",
+                    "UPDATE system_config SET config_value = ?, updated_at = datetime('now','localtime') WHERE config_key = ?",
                     (value, key)
                 )
             else:
@@ -231,7 +231,7 @@ class Database:
         conn = self._get_conn()
         try:
             conn.execute(
-                f"UPDATE email_tasks SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                f"UPDATE email_tasks SET {set_clause}, updated_at = datetime('now','localtime') WHERE id = ?",
                 values
             )
             conn.commit()
@@ -267,7 +267,7 @@ class Database:
         try:
             conn.execute(
                 """UPDATE task_logs
-                   SET status = ?, file_path = ?, error_message = ?, updated_at = CURRENT_TIMESTAMP
+                   SET status = ?, file_path = ?, error_message = ?, updated_at = datetime('now','localtime')
                    WHERE id = ?""",
                 (status, file_path, error_message, log_id)
             )
@@ -341,6 +341,40 @@ class Database:
                 (username, permission)
             ).fetchone()
             return row is not None
+        finally:
+            conn.close()
+
+    # ==================== 操作日志相关 ====================
+
+    def create_operation_log(self, username, action, detail=None, ip_address=None):
+        """记录用户操作日志"""
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                "INSERT INTO operation_logs (username, action, detail, ip_address) VALUES (?, ?, ?, ?)",
+                (username, action, detail, ip_address)
+            )
+            conn.commit()
+        except Exception as e:
+            self.logger.warning(f"记录操作日志失败: {e}")
+        finally:
+            conn.close()
+
+    def get_operation_logs(self, limit=100, username=None):
+        """查询操作日志"""
+        conn = self._get_conn()
+        try:
+            if username:
+                rows = conn.execute(
+                    "SELECT * FROM operation_logs WHERE username = ? ORDER BY created_at DESC LIMIT ?",
+                    (username, limit)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM operation_logs ORDER BY created_at DESC LIMIT ?",
+                    (limit,)
+                ).fetchall()
+            return [dict(r) for r in rows]
         finally:
             conn.close()
 

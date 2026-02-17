@@ -1,111 +1,103 @@
 import json
-import os
-from dotenv import load_dotenv
-
-# 加载环境变量
-load_dotenv()
+import logging
 
 
 class ConfigTool:
-    def __init__(self, config_path):
-        self.config_path = config_path
-        self.config = self._load_config()
+    """
+    配置工具类，从 SQLite 数据库的 system_config 表读取配置。
+    """
 
-    def _load_config(self):
+    def __init__(self, db):
         """
-        加载配置文件，支持回退机制：
-        1. 优先读取 config.json（本地配置，包含敏感信息，被 gitignore）
-        2. 如果不存在，回退到 config.json.example（模板文件，可提交到 Git）
+        :param db: database.db.Database 实例
         """
-        config = {}
-        
-        # 尝试读取主配置文件
-        if os.path.exists(self.config_path):
-            try:
-                with open(self.config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                print(f"已加载配置文件: {self.config_path}")
-                return config
-            except Exception as e:
-                print(f"加载配置文件出错: {e}")
-        
-        # 回退到 example 文件
-        example_path = self.config_path.replace('.json', '.json.example')
-        if os.path.exists(example_path):
-            try:
-                with open(example_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                print(f"已加载配置模板: {example_path}")
-                return config
-            except Exception as e:
-                print(f"加载配置模板出错: {e}")
-        
-        print("警告: 未找到任何配置文件，将使用默认值")
-        return {}
+        self.db = db
+        self.logger = logging.getLogger(__name__)
+        self.logger.debug("ConfigTool 已初始化（从数据库读取配置）")
+
+    def _get(self, key, default=None):
+        """从数据库读取单个配置值"""
+        return self.db.get_config(key, default)
+
+    def _get_json(self, key, default=None):
+        """从数据库读取 JSON 格式的配置值并解析"""
+        raw = self._get(key)
+        if raw is None:
+            return default if default is not None else {}
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, TypeError) as e:
+            self.logger.warning(f"配置项 {key} 的值不是有效 JSON: {e}")
+            return default if default is not None else {}
 
     def get_username(self):
-        """从环境变量获取用户名"""
-        return os.environ.get('TUST_USERNAME', '')
+        """获取公寓系统用户名"""
+        return self._get('tust_username', '')
 
     def get_password(self):
-        """从环境变量获取密码"""
-        return os.environ.get('TUST_PASSWORD', '')
+        """获取公寓系统密码"""
+        return self._get('tust_password', '')
 
     def get_pagesize(self):
-        return self.config.get("pagesize", 20)
+        """获取分页大小"""
+        val = self._get('pagesize', '20')
+        try:
+            return int(val)
+        except (ValueError, TypeError):
+            return 20
 
     def get_data_cfg(self):
-        return self.config.get("data_cfg", {})
+        """获取学院名称映射（JSON）"""
+        return self._get_json('data_cfg', {})
 
     def get_bid_dict(self):
-        return self.config.get("bid_dict", {})
+        """获取楼栋 ID 映射（JSON）"""
+        return self._get_json('bid_dict', {})
 
     def get_beginTime(self):
-        """优先从环境变量获取，其次从配置文件"""
-        return os.environ.get('BEGIN_TIME') or self.config.get("beginTime", "23:20:00")
+        """获取默认查询开始时间"""
+        return self._get('begin_time', '23:20:00')
 
     def get_endTime(self):
-        """优先从环境变量获取，其次从配置文件"""
-        return os.environ.get('END_TIME') or self.config.get("endTime", "05:30:00")
+        """获取默认查询结束时间"""
+        return self._get('end_time', '05:30:00')
 
     def get_flag(self):
-        return self.config.get("flag", "")
+        """获取 flag 配置（兼容旧逻辑）"""
+        return self._get('flag', '')
 
     def get_env(self):
-        """优先从环境变量获取运行环境"""
-        return os.environ.get('ENV') or self.config.get("env", "test")
+        """获取运行环境"""
+        return self._get('env', 'test')
 
     def get_driver_location(self):
         """
-        从环境变量获取 ChromeDriver 路径
-        环境变量优先级最高，即使为空字符串也返回（让 Selenium 自动管理）
+        获取 ChromeDriver 路径。
+        根据 env 配置决定返回测试环境还是生产环境路径。
         """
-        if 'CHROMEDRIVER_PATH' in os.environ:
-            return os.environ.get('CHROMEDRIVER_PATH', '')
         env = self.get_env()
         if env == "prod":
-            return self.config.get("driver_location_prod", "")
+            return self._get('chromedriver_path_prod', '')
         else:
-            return self.config.get("driver_location_test", "")
+            return self._get('chromedriver_path', '')
 
     def get_binary_location(self):
         """
-        从环境变量获取 Chrome 浏览器路径
-        环境变量优先级最高，即使为空字符串也返回（让 Selenium 自动管理）
+        获取 Chrome 浏览器路径。
+        根据 env 配置决定返回测试环境还是生产环境路径。
         """
-        if 'CHROME_BINARY_PATH' in os.environ:
-            return os.environ.get('CHROME_BINARY_PATH', '')
         env = self.get_env()
         if env == "prod":
-            return self.config.get("binary_location_prod", "")
+            return self._get('chrome_binary_path_prod', '')
         else:
-            return self.config.get("binary_location_test", "")
+            return self._get('chrome_binary_path', '')
 
 
 # 使用示例
 if __name__ == "__main__":
-    config_path = "config.json"
-    config_tool = ConfigTool(config_path)
+    from database.db import Database
+    db = Database()
+    config_tool = ConfigTool(db)
 
     print("用户名:", config_tool.get_username())
     print("密码:", "***" if config_tool.get_password() else "(未设置)")

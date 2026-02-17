@@ -1,16 +1,20 @@
 import requests
 from datetime import datetime, timedelta
 
-from get_excel_data_curr.ConfigTool import ConfigTool
 
-def deal(cookie, buildingId, b_num, requst_data):
+def deal(cookie, buildingId, b_num, requst_data, page_size=20):
+    """
+    查询指定楼栋的晚归数据。
+    :param cookie: 登录后的 session cookie
+    :param buildingId: 楼栋在公寓系统中的内部 ID
+    :param b_num: 楼栋编号
+    :param requst_data: 请求数据（包含 startTime, endTime 等）
+    :param page_size: 每页数据条数，从调用方传入
+    """
     # 获取当前日期
     current_date = datetime.now().strftime("%Y-%m-%d")
     # 获取前一天日期
     previous_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-
-    config_tool = ConfigTool("./get_excel_data_curr/config.json")
-    page_size = config_tool.get_pagesize()
 
     # 根据楼栋号判断使用哪个楼群ID
     # 中院: 1-14 (1栋到12B栋)
