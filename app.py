@@ -54,7 +54,6 @@ def login():
         session['role'] = user['role']
         logging.debug(f"User {username} logged in successfully")
         db.create_operation_log(username, 'login', '登录成功', request.remote_addr)
-        flash('登录成功！')
         return redirect(url_for('dashboard'))
 
     logging.debug("Rendering login.html")
