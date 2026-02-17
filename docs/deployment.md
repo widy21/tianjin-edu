@@ -30,7 +30,6 @@
 | `database/schema.sql` | ✅ 已提交 | 数据库表结构（建表语句） |
 | `database/init_data.sql` | ❌ 忽略 | 初始化数据（含密码等敏感信息） |
 | `data/edu.db` | ❌ 忽略 | SQLite 数据库文件 |
-| `get_excel_data_curr/config.json` | ❌ 忽略 | 旧版配置文件（已废弃，ConfigTool 已改为从数据库读取） |
 
 ### 数据库中存储的配置
 
