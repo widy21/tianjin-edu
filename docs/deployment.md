@@ -30,7 +30,7 @@
 | `database/schema.sql` | ✅ 已提交 | 数据库表结构（建表语句） |
 | `database/init_data.sql` | ❌ 忽略 | 初始化数据（含密码等敏感信息） |
 | `data/edu.db` | ❌ 忽略 | SQLite 数据库文件 |
-| `get_excel_data_curr/config.json` | ❌ 忽略 | 旧版配置文件（仍被 Selenium 模块读取） |
+| `get_excel_data_curr/config.json` | ❌ 忽略 | 旧版配置文件（已废弃，ConfigTool 已改为从数据库读取） |
 
 ### 数据库中存储的配置
 
@@ -41,7 +41,8 @@
 | `tust_username` / `tust_password` | 公寓管理系统凭据 | `27011228` |
 | `env` | 运行环境 | `prod` / `test` |
 | `chrome_binary_path` / `chromedriver_path` | 浏览器路径（空值=自动管理） | `/opt/google/chrome/chrome` |
-| `smtp_server` / `smtp_port` / `sender_email` / `sender_password` | 邮件 SMTP 配置 | `smtp.qq.com` |
+| `smtp_server` / `smtp_port` / `sender_email` / `sender_password` | 邮件 SMTP 配置 | `smtp.163.com` |
+| `flag` | 系统标识 | `whosyourdady` |
 | `scheduler_enabled` / `scheduler_timezone` | 定时调度器配置 | `true` / `Asia/Shanghai` |
 | `bid_dict` | 楼栋 ID 映射（JSON） | `{"1":"7d67..."}` |
 | `data_cfg` | 学院名称映射（JSON） | `{"人工智能学院":"人工智能学院"}` |
@@ -101,22 +102,14 @@ echo 'FLASK_SECRET_KEY=your_very_long_random_secret_key_here' > .env
 python3 -c "import secrets; print('FLASK_SECRET_KEY=' + secrets.token_hex(32))" > .env
 ```
 
-### 步骤 5：上传旧版配置文件（兼容）
-
-当前 Selenium 模块仍读取 `config.json`，需要上传：
-
-```bash
-scp get_excel_data_curr/config.json user@your-server-ip:/path/to/tianjin-edu/get_excel_data_curr/
-```
-
-### 步骤 6：启动服务
+### 步骤 5：启动服务
 
 ```bash
 chmod +x restart.sh
 ./restart.sh
 ```
 
-### 步骤 7：验证并配置
+### 步骤 6：验证并配置
 
 1. 浏览器访问 `http://your-server-ip/login`，使用 admin 账号登录
 2. 访问 `http://your-server-ip/admin/`，检查系统配置是否正确

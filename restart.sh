@@ -10,7 +10,7 @@ done
 
 # 启动 app.py 并将输出重定向到 out.log
 echo "Starting app.py in the background..."
-nohup python3 app.py > out.log &
+nohup python3 app.py >> out.log 2>&1 &
 
 # 输出脚本完成信息
 echo "Script completed. Check out.log for output."
