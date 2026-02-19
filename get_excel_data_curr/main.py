@@ -135,7 +135,7 @@ def process(data=None):
                 ret_dict[b_num] = ret_data
 
             # 生成excel数据
-            file_name = gen_excel_data_v1(ret_dict, data['username'], data_cfg=data_cfg)
+            file_name = gen_excel_data_v1(ret_dict, data['username'], data_cfg=data_cfg, request_data=data)
 
             return {
                 'file_name': file_name,

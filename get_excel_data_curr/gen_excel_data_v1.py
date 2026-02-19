@@ -65,12 +65,13 @@ def convert_building_show(bid):
     else:
         return str(bid)
 
-def gen_excel_data_v1(ret_dict, username, data_cfg=None):
+def gen_excel_data_v1(ret_dict, username, data_cfg=None, request_data=None):
     """
     生成 Excel 晚归数据文件。
     :param ret_dict: 各楼栋的晚归数据
     :param username: 用户名（用于文件路径）
     :param data_cfg: 学院名称映射字典，从调用方传入
+    :param request_data: 请求数据（包含 startDate, endDate 等）
     """
     if data_cfg is None:
         data_cfg = {}
@@ -189,14 +190,15 @@ def gen_excel_data_v1(ret_dict, username, data_cfg=None):
         idx += 1
 
     ## 保存修改后的工作簿
-    # 获取当前时间
-    now = datetime.datetime.now()
-    # 减去一天
-    one_day = datetime.timedelta(days=1)
-    yesterday = now - one_day
-
-    # 格式化昨天的时间为月日的形式，例如 9.19
-    formatted_yesterday = f"{yesterday.month}.{yesterday.day}"
+    # 根据查询的起止日期生成文件名
+    if request_data and request_data.get('startDate') and request_data.get('endDate'):
+        start_dt = datetime.datetime.strptime(request_data['startDate'], "%Y-%m-%d")
+        end_dt = datetime.datetime.strptime(request_data['endDate'], "%Y-%m-%d")
+        date_range = f"({start_dt.month}.{start_dt.day}-{end_dt.month}.{end_dt.day})"
+    else:
+        now = datetime.datetime.now()
+        yesterday = now - datetime.timedelta(days=1)
+        date_range = f"({yesterday.month}.{yesterday.day}-{now.month}.{now.day})"
 
     path = f"./result-files/{username}"
     if not os.path.exists(path):
@@ -205,7 +207,7 @@ def gen_excel_data_v1(ret_dict, username, data_cfg=None):
     else:
         logging.debug(f'======================path[{path}]已存在========================')
 
-    file_name = '公寓学生晚归名单{}.xlsx'.format(formatted_yesterday)
+    file_name = f'公寓学生晚归名单{date_range}.xlsx'
     file_path = f'{path}/{file_name}'
     if os.path.exists(file_path):
         os.remove(file_path)
