@@ -190,15 +190,9 @@ def gen_excel_data_v1(ret_dict, username, data_cfg=None, request_data=None):
         idx += 1
 
     ## 保存修改后的工作簿
-    # 根据查询的起止日期生成文件名
-    if request_data and request_data.get('startDate') and request_data.get('endDate'):
-        start_dt = datetime.datetime.strptime(request_data['startDate'], "%Y-%m-%d")
-        end_dt = datetime.datetime.strptime(request_data['endDate'], "%Y-%m-%d")
-        date_range = f"({start_dt.month}.{start_dt.day}-{end_dt.month}.{end_dt.day})"
-    else:
-        now = datetime.datetime.now()
-        yesterday = now - datetime.timedelta(days=1)
-        date_range = f"({yesterday.month}.{yesterday.day}-{now.month}.{now.day})"
+    # 使用当前日期生成文件名
+    now = datetime.datetime.now()
+    formatted_date = f"{now.year}.{now.month}.{now.day}"
 
     path = f"./result-files/{username}"
     if not os.path.exists(path):
@@ -207,7 +201,7 @@ def gen_excel_data_v1(ret_dict, username, data_cfg=None, request_data=None):
     else:
         logging.debug(f'======================path[{path}]已存在========================')
 
-    file_name = f'公寓学生晚归名单{date_range}.xlsx'
+    file_name = f'滨海校区晚归名单{formatted_date}.xlsx'
     file_path = f'{path}/{file_name}'
     if os.path.exists(file_path):
         os.remove(file_path)
@@ -230,6 +224,9 @@ def set_style(new_sheet1):
         for cell in row:
             cell.alignment = align
             cell.border = border
+    # 设置行高为24
+    for row in new_sheet1.iter_rows():
+        new_sheet1.row_dimensions[row[0].row].height = 24
     # 设置自适应列宽
     for col in new_sheet1.columns:
         max_length = 0
