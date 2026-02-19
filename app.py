@@ -68,9 +68,10 @@ def dashboard():
     user = db.get_user(username)
     is_admin = user and user['role'] == 'admin'
     has_admin_perm = db.has_permission(username, 'admin')  # 是否有"管理页面"权限
+    has_custom_date = db.has_permission(username, 'custom_date')  # 是否有"自定义日期"权限
     allowed_buildings = db.get_user_buildings(username)  # 空列表表示全部
     logging.debug(f"Rendering dashboard.html for user {username}")
-    return render_template('dashboard.html', username=username, is_admin=is_admin, has_admin_perm=has_admin_perm, allowed_buildings=allowed_buildings)
+    return render_template('dashboard.html', username=username, is_admin=is_admin, has_admin_perm=has_admin_perm, has_custom_date=has_custom_date, allowed_buildings=allowed_buildings)
 
 
 # 退出登录路由

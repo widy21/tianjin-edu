@@ -11,10 +11,15 @@ def deal(cookie, buildingId, b_num, requst_data, page_size=20):
     :param requst_data: 请求数据（包含 startTime, endTime 等）
     :param page_size: 每页数据条数，从调用方传入
     """
-    # 获取当前日期
-    current_date = datetime.now().strftime("%Y-%m-%d")
-    # 获取前一天日期
-    previous_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    # 如果请求数据中包含自定义日期则使用，否则自动计算
+    if requst_data.get('startDate'):
+        previous_date = requst_data['startDate']
+    else:
+        previous_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    if requst_data.get('endDate'):
+        current_date = requst_data['endDate']
+    else:
+        current_date = datetime.now().strftime("%Y-%m-%d")
 
     # 根据楼栋号判断使用哪个楼群ID
     # 中院: 1-14 (1栋到12B栋)

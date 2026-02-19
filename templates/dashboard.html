@@ -183,6 +183,16 @@
             transition: border-color 0.2s;
         }
         .time-row input[type="time"]:focus { border-color: #4CAF50; }
+        .time-row input[type="date"] {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #333;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .time-row input[type="date"]:focus { border-color: #4CAF50; }
 
         /* 下载区 */
         .download-area {
@@ -313,7 +323,13 @@
         <div class="card">
             <div class="card-title">查询条件</div>
             <div class="time-row">
+                {% if has_custom_date %}
+                <div><label for="startDate">开始日期</label><input type="date" id="startDate" name="startDate"></div>
+                {% endif %}
                 <div><label for="startTime">开始时间</label><input type="time" id="startTime" name="startTime" required value="23:20:00"></div>
+                {% if has_custom_date %}
+                <div><label for="endDate">结束日期</label><input type="date" id="endDate" name="endDate"></div>
+                {% endif %}
                 <div><label for="endTime">结束时间</label><input type="time" id="endTime" name="endTime" required value="05:30:00"></div>
             </div>
 
@@ -330,6 +346,14 @@
 </div>
 
 <script>
+    function getDefaultDates() {
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const fmt = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        return { startDate: fmt(yesterday), endDate: fmt(today) };
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         {% if username == 'admin' %}
         // admin账号默认选中第4、5、7个元素（索引从0开始）
@@ -342,6 +366,12 @@
         });
         {% endif %}
         updateSelectedBuildings();
+        // 设置日期默认值
+        const defaults = getDefaultDates();
+        const startDateEl = document.getElementById('startDate');
+        const endDateEl = document.getElementById('endDate');
+        if (startDateEl) startDateEl.value = defaults.startDate;
+        if (endDateEl) endDateEl.value = defaults.endDate;
     });
 
     function setSubmitBtnLoading(loading) {
@@ -362,15 +392,23 @@
         const startTime = document.getElementById('startTime').value;
         const endTime = document.getElementById('endTime').value;
 
+        const payload = {
+            buildings: getSelectedBuildings(),
+            startTime: startTime,
+            endTime: endTime,
+            username: "{{ username }}",
+        };
+
+        // 如果有日期输入框，传递自定义日期
+        const startDateEl = document.getElementById('startDate');
+        const endDateEl = document.getElementById('endDate');
+        if (startDateEl && startDateEl.value) payload.startDate = startDateEl.value;
+        if (endDateEl && endDateEl.value) payload.endDate = endDateEl.value;
+
         fetch('/query', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                buildings: getSelectedBuildings(),
-                startTime: startTime,
-                endTime: endTime,
-                username: "{{ username }}",
-            }),
+            body: JSON.stringify(payload),
         })
         .then(response => response.json())
         .then(data => {
@@ -397,6 +435,12 @@
         document.getElementById('downloadFileName').removeAttribute('href');
         document.getElementById('startTime').value = '23:20:00';
         document.getElementById('endTime').value = '05:30:00';
+        // 重置日期为默认值
+        const defaults = getDefaultDates();
+        const startDateEl = document.getElementById('startDate');
+        const endDateEl = document.getElementById('endDate');
+        if (startDateEl) startDateEl.value = defaults.startDate;
+        if (endDateEl) endDateEl.value = defaults.endDate;
     }
 
     function updateSelectedBuildings() {

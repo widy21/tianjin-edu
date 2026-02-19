@@ -287,7 +287,10 @@ def test_flask_app():
             username = session['username']
             user = db.get_user(username)
             is_admin = user and user['role'] == 'admin'
-            return render_template('dashboard.html', username=username, is_admin=is_admin)
+            has_admin_perm = db.has_permission(username, 'admin')
+            has_custom_date = db.has_permission(username, 'custom_date')
+            allowed_buildings = db.get_user_buildings(username)
+            return render_template('dashboard.html', username=username, is_admin=is_admin, has_admin_perm=has_admin_perm, has_custom_date=has_custom_date, allowed_buildings=allowed_buildings)
 
         @test_app.route('/logout')
         def logout():
