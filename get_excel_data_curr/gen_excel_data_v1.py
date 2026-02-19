@@ -93,6 +93,20 @@ def gen_excel_data_v1(ret_dict, username, data_cfg=None):
     for bid, ret_data in ret_dict_new.items():
         all_data += ret_data
 
+    # 排序：先按学院升序，再按日期升序，最后按晚归时间升序
+    def sort_key(row):
+        # 学院：使用映射后的名称排序
+        institute = row.get('schoolInstituteName', '')
+        if institute in data_cfg:
+            institute_name = data_cfg[institute]
+        else:
+            institute_name = institute[0:2] + institute[-2:] if len(institute) >= 2 else institute
+        # 日期和时间直接用 passTimeText 字符串排序（格式 YYYY-MM-DD HH:MM:SS，天然支持字典序）
+        pass_time = row.get('passTimeText', '')
+        return (institute_name, pass_time)
+
+    all_data.sort(key=sort_key)
+
     new_sheet1 = new_workbook.active
 
     # 生成sheet名称，Excel sheet名称最多31个字符
