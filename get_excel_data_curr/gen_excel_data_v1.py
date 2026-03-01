@@ -129,7 +129,7 @@ def gen_excel_data_v1(ret_dict, username, data_cfg=None, request_data=None):
     new_sheet1['G1'] = '培养层次'
     new_sheet1['H1'] = '晚归时间'
 
-    required_fields = ['passTimeText', 'schoolInstituteName', 'userId', 'userName', 'roomName', 'grade']
+    required_fields = ['passTimeText', 'schoolInstituteName', 'userId', 'userName', 'roomName', 'grade', 'studentType']
 
     idx = 2
     for row in all_data:
@@ -170,26 +170,14 @@ def gen_excel_data_v1(ret_dict, username, data_cfg=None, request_data=None):
         # 年级列
         new_sheet1[f'F{idx}'] = str(row.get('grade', ''))
 
-        # 培养层次：根据楼栋和宿舍号判断
-        # 4、5、7、11A、11B栋是研究生，其他是本科
-        # 4栋部分宿舍是本科
-        building_num = room_name.split('-')[0] if '-' in room_name else ''
-
-        # 4栋本科宿舍列表
-        building_4_undergraduate = [
-            '4-101', '4-103', '4-105', '4-107', '4-109', '4-111', '4-113', '4-115', '4-117',
-            '4-121', '4-123', '4-125', '4-127', '4-129', '4-137', '4-139', '4-141', '4-143',
-            '4-201', '4-202', '4-203', '4-204', '4-205', '4-206', '4-207', '4-208', '4-209', '4-210',
-            '4-211', '4-212', '4-213', '4-214', '4-215', '4-216', '4-217', '4-218', '4-219', '4-220',
-            '4-221', '4-222', '4-223', '4-224', '4-225', '4-227', '4-228'
-        ]
-
-        if room_name in building_4_undergraduate:
+        # 培养层次：直接使用API返回的studentType字段
+        student_type = row.get('studentType', '')
+        if student_type == '本科生':
             new_sheet1[f'G{idx}'] = '本科'
-        elif building_num in ['4', '5', '7', '11A', '11B']:
+        elif student_type == '研究生':
             new_sheet1[f'G{idx}'] = '研究生'
         else:
-            new_sheet1[f'G{idx}'] = '本科'
+            new_sheet1[f'G{idx}'] = student_type or '本科'
 
         # 晚归时间列
         new_sheet1[f'H{idx}'] = pass_time_text[10:16] if len(pass_time_text) >= 16 else ''
