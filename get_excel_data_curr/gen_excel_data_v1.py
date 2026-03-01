@@ -129,8 +129,15 @@ def gen_excel_data_v1(ret_dict, username, data_cfg=None, request_data=None):
     new_sheet1['G1'] = '培养层次'
     new_sheet1['H1'] = '晚归时间'
 
+    required_fields = ['passTimeText', 'schoolInstituteName', 'userId', 'userName', 'roomName', 'grade']
+
     idx = 2
     for row in all_data:
+        # 检测关键字段缺失，记录异常数据到日志
+        missing = [f for f in required_fields if f not in row or row[f] is None]
+        if missing:
+            logging.warning(f"数据记录缺少字段 {missing}，完整数据: {row}")
+
         # 日期列
         pass_time_text = str(row.get('passTimeText', ''))
         if pass_time_text:
