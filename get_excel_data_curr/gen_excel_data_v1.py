@@ -132,37 +132,40 @@ def gen_excel_data_v1(ret_dict, username, data_cfg=None, request_data=None):
     idx = 2
     for row in all_data:
         # 日期列
-        date_time = datetime.datetime.strptime(str(row['passTimeText']), "%Y-%m-%d %H:%M:%S")
-        # 格式化输出为"月.日"的形式
-        formatted_date = f"{date_time.month}.{date_time.day}"
+        pass_time_text = str(row.get('passTimeText', ''))
+        if pass_time_text:
+            date_time = datetime.datetime.strptime(pass_time_text, "%Y-%m-%d %H:%M:%S")
+            formatted_date = f"{date_time.month}.{date_time.day}"
+        else:
+            formatted_date = ''
         new_sheet1[f'A{idx}'] = formatted_date
 
         # 学院列
-        start = row['schoolInstituteName'][0:2]  # 开头的字符
-        end = row['schoolInstituteName'][-2:]  # 结尾的字符
-        if row['schoolInstituteName'] in data_cfg:
-            new_value = data_cfg[row['schoolInstituteName']]
+        institute_name = row.get('schoolInstituteName', '')
+        if institute_name and institute_name in data_cfg:
+            new_value = data_cfg[institute_name]
+        elif len(institute_name) >= 2:
+            new_value = institute_name[0:2] + institute_name[-2:]
         else:
-            new_value = start + end  # 拼接新的值
+            new_value = institute_name
         new_sheet1[f'B{idx}'] = new_value
 
         # 学号列
-        new_sheet1[f'C{idx}'] = str(row['userId'])
+        new_sheet1[f'C{idx}'] = str(row.get('userId', ''))
 
         # 姓名列
-        new_sheet1[f'D{idx}'] = str(row['userName'])
+        new_sheet1[f'D{idx}'] = str(row.get('userName', ''))
 
         # 宿舍号列
-        new_val = str(row['roomName'])
-        new_sheet1[f'E{idx}'] = new_val
+        room_name = str(row.get('roomName', ''))
+        new_sheet1[f'E{idx}'] = room_name
 
         # 年级列
-        new_sheet1[f'F{idx}'] = str(row['grade'])
+        new_sheet1[f'F{idx}'] = str(row.get('grade', ''))
 
         # 培养层次：根据楼栋和宿舍号判断
         # 4、5、7、11A、11B栋是研究生，其他是本科
         # 4栋部分宿舍是本科
-        room_name = str(row['roomName'])
         building_num = room_name.split('-')[0] if '-' in room_name else ''
 
         # 4栋本科宿舍列表
@@ -182,7 +185,7 @@ def gen_excel_data_v1(ret_dict, username, data_cfg=None, request_data=None):
             new_sheet1[f'G{idx}'] = '本科'
 
         # 晚归时间列
-        new_sheet1[f'H{idx}'] = str(row['passTimeText'])[10:16]
+        new_sheet1[f'H{idx}'] = pass_time_text[10:16] if len(pass_time_text) >= 16 else ''
 
         # 设置样式
         set_style(new_sheet1)
