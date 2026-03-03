@@ -148,7 +148,7 @@ def process(data=None):
             print("登录后页面加载超时，可能登录失败。")
             return {
                 'msg': "登录后页面加载超时，可能登录失败。",
-                'status': 'success',
+                'status': 'false',
             }
 
     except Exception as e:
