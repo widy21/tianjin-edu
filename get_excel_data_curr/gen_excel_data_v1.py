@@ -188,9 +188,9 @@ def gen_excel_data_v1(ret_dict, username, data_cfg=None, request_data=None):
         idx += 1
 
     ## 保存修改后的工作簿
-    # 使用当前日期生成文件名
-    now = datetime.datetime.now()
-    formatted_date = f"{now.year}.{now.month}.{now.day}"
+    # 使用前一天日期生成文件名（晚归数据是前一天晚上的）
+    yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+    formatted_date = f"{yesterday.year}.{yesterday.month}.{yesterday.day}"
 
     path = f"./result-files/{username}"
     if not os.path.exists(path):
