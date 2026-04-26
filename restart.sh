@@ -1,16 +1,23 @@
 #!/bin/bash
+set -e
 
-# 查找并杀掉包含 app.py 的进程
+APP_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$APP_DIR"
+
 echo "Killing processes containing app.py..."
-pids=$(ps -ef | grep 'app.py' | grep -v grep | awk '{print $2}')
+pids=$(pgrep -f "python.*app.py" || true)
 for pid in $pids; do
     echo "Killing process $pid"
-    kill $pid
+    kill "$pid"
 done
 
-# 启动 app.py 并将输出重定向到 out.log
-echo "Starting app.py in the background..."
-nohup python3 app.py >> out.log 2>&1 &
+if [ -x "$APP_DIR/.venv/bin/python" ]; then
+    PYTHON_BIN="$APP_DIR/.venv/bin/python"
+else
+    PYTHON_BIN="${PYTHON_BIN:-python3}"
+fi
 
-# 输出脚本完成信息
+echo "Starting app.py in the background with ${PYTHON_BIN}..."
+nohup "$PYTHON_BIN" app.py >> out.log 2>&1 &
+
 echo "Script completed. Check out.log for output."
