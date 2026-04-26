@@ -5,6 +5,47 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 
+class DataFetchError(Exception):
+    """Raised when a building data API request did not return usable JSON data."""
+
+
+def _response_is_login_page(response):
+    """Detect CAS redirects that requests follows and reports as HTTP 200."""
+    final_url = getattr(response, 'url', '') or ''
+    if '/cas/login' in final_url:
+        return True
+    for item in getattr(response, 'history', []) or []:
+        location = item.headers.get('Location', '')
+        if '/cas/login' in location:
+            return True
+    return False
+
+
+def _raise_fetch_error(message, response=None, error=None):
+    if response is not None:
+        logger.error(f"响应状态码: {response.status_code}")
+        logger.error(f"响应最终URL: {getattr(response, 'url', '')}")
+        logger.error(f"响应内容前500字符: {response.text[:500]}")
+    if error is not None:
+        logger.error(f"JSON 解析错误: {error}")
+    raise DataFetchError(message)
+
+
+def _parse_json_response(response, b_num, page_index=None):
+    label = f"楼栋{b_num}" if page_index is None else f"楼栋{b_num}第{page_index}页"
+    if response.status_code != 200:
+        logger.error(f"API 响应状态异常 -{label}")
+        _raise_fetch_error(f"{label}接口状态异常: {response.status_code}", response=response)
+    if _response_is_login_page(response):
+        logger.error(f"API 请求被重定向到登录页 -{label}")
+        _raise_fetch_error(f"{label}登录态失效，接口返回登录页", response=response)
+    try:
+        return response.json()
+    except Exception as e:
+        logger.error(f"API 响应解析失败 -{label}")
+        _raise_fetch_error(f"{label}响应不是有效 JSON", response=response, error=e)
+
+
 def deal(cookie, buildingId, b_num, requst_data, page_size=20):
     """
     查询指定楼栋的晚归数据。
@@ -72,42 +113,27 @@ def deal(cookie, buildingId, b_num, requst_data, page_size=20):
 
     all_rows = []
     response = requests.get(url, headers=headers, params=params, cookies=cookies, verify=False)
-    if response.status_code == 200:
-        # 尝试解析 JSON，添加错误处理
-        try:
-            json_data = response.json()
-        except Exception as e:
-            logger.error(f"API 响应解析失败 -楼栋{b_num}")
-            logger.error(f"响应状态码: {response.status_code}")
-            logger.error(f"响应内容前500字符: {response.text[:500]}")
-            logger.error(f"JSON 解析错误: {e}")
-            return []
+    json_data = _parse_json_response(response, b_num)
 
-        if json_data is None or 'total' not in json_data:
-            logger.error(f"API 响应格式异常 -楼栋{b_num}，缺少 'total' 字段")
-            logger.error(f"响应内容: {response.text[:500]}")
-            return []
+    if json_data is None or 'total' not in json_data:
+        logger.error(f"API 响应格式异常 -楼栋{b_num}，缺少 'total' 字段")
+        _raise_fetch_error(f"楼栋{b_num}响应缺少 total 字段", response=response)
 
-        total_rows = json_data['total']
-        page_num = int(total_rows / page_size) if total_rows % page_size == 0 else int(total_rows / page_size) + 1
-        print(f'处理公寓{b_num}数据，page_num={page_num}')
-        for i in range(page_num):
-            print(f'查询第{i}页')
-            params["offset"] = i * page_size
-            response = requests.get(url, headers=headers, params=params, cookies=cookies, verify=False)
-            try:
-                page_json = response.json()
-                if page_json and 'rows' in page_json:
-                    all_rows += page_json['rows']
-                else:
-                    logger.warning(f"第{i}页响应缺少 'rows' 字段 -楼栋{b_num}")
-            except Exception as e:
-                logger.error(f"第{i}页 JSON 解析失败 -楼栋{b_num}")
-                logger.error(f"响应内容前500字符: {response.text[:500]}")
-                logger.error(f"JSON 解析错误: {e}")
+    total_rows = json_data['total']
+    page_num = int(total_rows / page_size) if total_rows % page_size == 0 else int(total_rows / page_size) + 1
+    print(f'处理公寓{b_num}数据，page_num={page_num}')
+    for i in range(page_num):
+        print(f'查询第{i}页')
+        params["offset"] = i * page_size
+        response = requests.get(url, headers=headers, params=params, cookies=cookies, verify=False)
+        page_json = _parse_json_response(response, b_num, page_index=i)
+        if page_json and 'rows' in page_json:
+            all_rows += page_json['rows']
+        else:
+            logger.error(f"第{i}页响应缺少 'rows' 字段 -楼栋{b_num}")
+            _raise_fetch_error(f"楼栋{b_num}第{i}页响应缺少 rows 字段", response=response)
 
     print(f'共{len(all_rows)}条记录')
     return all_rows
 
 # deal('a87653ef-07b6-4ae5-8682-8378cb052e67')
-

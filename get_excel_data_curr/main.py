@@ -175,9 +175,26 @@ def process(data=None):
         # 循环查n个公寓数据
         print("数据处理中，具体进度如下：")
         ret_dict = {}
+        fetch_errors = []
         for b_num, bid in new_bid_dict.items():
-            ret_data = t3.deal(value_, bid, b_num, data, page_size=page_size)
-            ret_dict[b_num] = ret_data
+            try:
+                ret_data = t3.deal(value_, bid, b_num, data, page_size=page_size)
+                ret_dict[b_num] = ret_data
+            except t3.DataFetchError as e:
+                error_msg = f"楼栋{b_num}: {e}"
+                fetch_errors.append(error_msg)
+                logger.error(f"楼栋取数失败: {error_msg}")
+
+        if not ret_dict:
+            msg = "所有楼栋取数失败：" + "；".join(fetch_errors)
+            logger.error(msg)
+            return {
+                'msg': msg,
+                'status': 'false',
+            }
+
+        if fetch_errors:
+            logger.warning(f"部分楼栋取数失败，继续生成成功楼栋报表：{'；'.join(fetch_errors)}")
         
         # 生成excel数据
         file_name = gen_excel_data_v1(ret_dict, data['username'], data_cfg=data_cfg, request_data=data)
